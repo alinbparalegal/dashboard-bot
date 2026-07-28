@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: estadistica-bot-api
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: MONGODB_URI
+        sync: false
+      - key: GHL_CYA_TOKEN
+        sync: false
+      - key: GHL_CYA_LOCATION_ID
+        value: 6aQktMIuWY6Ro5nqMuBa
+      - key: GHL_CYA_BOT_FIELD_ID
+        value: FgDt9dPFQTpONG6y5kgJ
+      - key: GHL_ETH_TOKEN
+        sync: false
+      - key: GHL_ETH_LOCATION_ID
+        value: aDNXFLTATVowszxfbRZw
+      - key: GHL_ETH_BOT_FIELD_ID
+        value: r0emtZxEtq26DtfShtwc
+      - key: GHL_ETV_TOKEN
+        sync: false
+      - key: GHL_ETV_LOCATION_ID
+        value: uNwxYAtULcjYejSTKp8i
+      - key: GHL_ETV_BOT_FIELD_ID
+        value: pB3wRK7zKVxzYuLTvGnG
+      - key: GHL_NAC_TOKEN
+        sync: false
+      - key: GHL_NAC_LOCATION_ID
+        value: KSsNmhRrq9dS4WXEm0AN
+      - key: GHL_NAC_BOT_FIELD_ID
+        value: nSq39GUTJ9kwOjPqgUOg
+      - key: GHL_MNEE_TOKEN
+        sync: false
+      - key: GHL_MNEE_LOCATION_ID
+        value: kkS6yMO2u81Zqm9TEjhC
+      - key: GHL_MNEE_BOT_FIELD_ID
+        value: ZYb9ycQeft7jb5C4s6i2
+      - key: BOT_LAUNCH_DATE
+        value: 2026-06-25

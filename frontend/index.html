@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Funnel de conversación — 5 marcas</title>
+  <link rel="stylesheet" href="/assets/dashboard.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="page">
+      <div class="header-top">
+        <div>
+          <div class="eyebrow">Dashboard de funnel &middot; histórico propio</div>
+          <h1 class="title">Funnel de conversación por marca</h1>
+        </div>
+        <button id="refresh-btn" class="refresh-btn" type="button">↻ Actualizar datos</button>
+      </div>
+      <p class="subtitle">Conversación → Cualificado → Cita, para las 5 marcas GHL, con histórico diario guardado.</p>
+      <div class="meta-row">
+        <span id="meta-periodo">Periodo: —</span>
+        <span>Fuente: GoHighLevel API + histórico propio (MongoDB)</span>
+        <span id="meta-actualizado"></span>
+      </div>
+    </header>
+
+    <section class="kpis" aria-label="Totales agregados">
+      <div class="kpi">
+        <span class="label">Conversación</span>
+        <span class="value" id="kpi-conversacion">—</span>
+        <span class="sub">leads con tag de estado del bot</span>
+      </div>
+      <div class="kpi">
+        <span class="label">Cualificado</span>
+        <span class="value" id="kpi-cualificado">—</span>
+        <span class="sub" id="kpi-cualificado-sub">—</span>
+      </div>
+      <div class="kpi accent">
+        <span class="label">Cita</span>
+        <span class="value" id="kpi-cita">—</span>
+        <span class="sub" id="kpi-cita-sub">—</span>
+      </div>
+      <div class="kpi">
+        <span class="label">Ingreso estimado</span>
+        <span class="value" id="kpi-ingreso">—</span>
+        <span class="sub">según precio de asesoría · rango online–presencial</span>
+      </div>
+    </section>
+
+    <section class="panels-grid">
+      <div class="heatmap-card">
+        <h2>Leads tratados — últimos 30 días</h2>
+        <div class="heatmap-grid" id="heatmap-grid"></div>
+        <div class="heatmap-legend">
+          <span class="sw" style="background:var(--surface-alt);border:1px solid var(--border);"></span> menos
+          <span class="sw" style="background:var(--accent);"></span> más
+          &middot; borde marcado = hoy / ayer &middot; clic en un día para el detalle por marca
+        </div>
+        <div id="day-detail"></div>
+      </div>
+
+      <div class="chart-card">
+        <h2>Tendencia — últimos 30 días</h2>
+        <div id="trend-chart"></div>
+        <div class="chart-legend">
+          <span><i style="background:var(--accent)"></i> Conversación</span>
+          <span><i style="background:var(--good)"></i> Cualificado</span>
+          <span><i style="background:var(--warn)"></i> Cita</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="compare-card">
+      <h2>Comparativa entre marcas</h2>
+      <div id="brand-compare"></div>
+    </section>
+
+    <section class="panels-grid">
+      <div class="chart-card">
+        <h2>Citas por marca</h2>
+        <div id="donut-citas"></div>
+      </div>
+      <div class="chart-card">
+        <h2>Procedencia de los leads</h2>
+        <div id="donut-canal"></div>
+      </div>
+    </section>
+
+    <section class="brands" id="brands" aria-label="Funnel por marca"></section>
+
+    <footer>
+      Conversación = unión de los 6 tags de estado del bot (persisten aunque se escale a un humano).
+      Cualificado = lead_potencial ∪ pago_pendiente ∪ consulta_agendada ∪ cliente_postventa.
+      Datos de hoy calculados en vivo; días anteriores leídos del histórico guardado cada noche.
+    </footer>
+  </div>
+
+  <script src="/assets/dashboard.js"></script>
+</body>
+</html>
