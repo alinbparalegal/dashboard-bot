@@ -300,7 +300,9 @@ async function computeCitasTimeline(desde, hasta) {
       const ev = eventByContact.get(c.id);
       return {
         nombre: c.nombre,
-        fecha: ev ? ev.fecha : c.dateUpdated,
+        // Fecha de creación del lead, igual criterio que el resto del dashboard (heatmap, etc.)
+        fecha: c.dateAdded,
+        fechaCitaReal: ev ? ev.fecha : null,
         estadoCita: ev ? ev.estado : null,
         verificado: !!ev,
       };

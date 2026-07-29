@@ -384,6 +384,11 @@ function fmtHora(iso) {
   if (isNaN(d)) return '—';
   return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 }
+function fmtFecha(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 
 function renderTimeline(marcas, computedAt) {
   $('#timeline-computed-at').textContent = computedAt ? `Calculado a las ${fmtHora(computedAt)}` : '';
@@ -393,9 +398,11 @@ function renderTimeline(marcas, computedAt) {
     }
     const rows = m.citas.map(c => `
       <div class="timeline-row">
-        <span class="tl-fecha">${fmtFechaHora(c.fecha)}</span>
-        <span class="tl-nombre">${c.nombre}${c.verificado ? '' : ' <span class=\"tl-unverified\">(sin reserva de calendario verificable)</span>'}</span>
-        <span class="tl-status">${c.estadoCita || ''}</span>
+        <span class="tl-fecha">${fmtFecha(c.fecha)}</span>
+        <span class="tl-nombre">${c.nombre}</span>
+        <span class="tl-status">${c.verificado
+          ? `cita real: ${fmtFechaHora(c.fechaCitaReal)} · ${c.estadoCita || ''}`
+          : '<span class="tl-unverified">sin reserva de calendario verificable</span>'}</span>
       </div>`).join('');
     return `
       <div class="timeline-brand">
