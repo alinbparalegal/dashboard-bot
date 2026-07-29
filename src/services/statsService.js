@@ -266,6 +266,56 @@ function getChannelBreakdown(desde, hasta) {
   return promise;
 }
 
+// Timeline de citas (tag consulta_agendada) por marca, con nombre y fecha. Se cruza con los
+// eventos de TODOS los calendarios de la marca para saber si la cita tiene una reserva real
+// verificable en GHL (el bot a veces marca el tag solo al enviar el enlace, sin confirmar que
+// la persona reservó de verdad) — ver conversación del 2026-07-29. Si no hay evento, se usa
+// dateUpdated del contacto como fecha aproximada y se marca verificado:false.
+const TIMELINE_TTL_MS = 15 * 60 * 1000;
+const timelineCache = new Map(); // "desde|hasta" -> { promise, expiresAt }
+
+async function computeCitasTimeline(desde, hasta) {
+  const brands = getBrands();
+  const perBrand = await Promise.all(brands.map(async brand => {
+    const contactos = await ghl.listByTag(brand, 'consulta_agendada', desde, hasta);
+
+    const calendars = await ghl.listCalendars(brand);
+    const startMs = new Date(desde).getTime();
+    const endMs = new Date(hasta).getTime() + 120 * 24 * 60 * 60 * 1000; // +120 días, por si la cita real cae más adelante
+    const eventByContact = new Map();
+    for (const cal of calendars) {
+      const events = await ghl.getCalendarEvents(brand, cal.id, startMs, endMs);
+      for (const ev of events) {
+        if (!eventByContact.has(ev.contactId)) {
+          eventByContact.set(ev.contactId, { fecha: ev.startTime, estado: ev.appointmentStatus, calendario: cal.name });
+        }
+      }
+    }
+
+    const citas = contactos.map(c => {
+      const ev = eventByContact.get(c.id);
+      return {
+        nombre: c.nombre,
+        fecha: ev ? ev.fecha : c.dateUpdated,
+        estadoCita: ev ? ev.estado : null,
+        verificado: !!ev,
+      };
+    }).sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+
+    return { marca: brand.code, nombre: brand.name, citas };
+  }));
+  return { desde, hasta, marcas: perBrand };
+}
+
+function getCitasTimeline(desde, hasta) {
+  const key = `${desde}|${hasta}`;
+  const cached = timelineCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+  const promise = computeCitasTimeline(desde, hasta);
+  timelineCache.set(key, { promise, expiresAt: Date.now() + TIMELINE_TTL_MS });
+  return promise;
+}
+
 module.exports = {
   computeDailyStatsForBrand,
   upsertDailyStats,
@@ -274,5 +324,6 @@ module.exports = {
   getDetailForDate,
   getSummary,
   getChannelBreakdown,
+  getCitasTimeline,
   todayStr,
 };

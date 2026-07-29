@@ -40,6 +40,20 @@ async function searchCount({ token, locationId, filters, sort }) {
   });
 }
 
+// Reintenta en errores transitorios de GHL (5xx / caída de conexión) — con ~130 llamadas
+// seguidas en el timeline de citas, un solo hipo de GHL no debe tirar todo el cálculo.
+async function withRetry(fn, retries = 2) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const is5xx = /GHL 5\d\d/.test(err.message);
+      if (!is5xx || attempt >= retries) throw err;
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+}
+
 function dateRangeFilter(gte, lte) {
   return { field: 'dateAdded', operator: 'range', value: { gte, lte } };
 }
@@ -86,4 +100,67 @@ async function countAll(brand, gte, lte) {
   });
 }
 
-module.exports = { countTag, countTagPair, countBotField, countAll };
+// Igual que countTag pero devuelve los contactos (id, nombre, tags), no solo el total.
+async function listByTag(brand, tag, gte, lte, pageLimit = 100) {
+  return rateLimited(async () => {
+    const res = await fetch(GHL_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${brand.token}`,
+        Version: '2021-07-28',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        locationId: brand.locationId,
+        pageLimit,
+        filters: [
+          { field: 'tags', operator: 'contains', value: tag },
+          dateRangeFilter(gte, lte),
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`GHL ${res.status}: ${text.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return (data.contacts || []).map(c => ({
+      id: c.id,
+      nombre: c.contactName || [c.firstName, c.lastName].filter(Boolean).join(' ') || '(sin nombre)',
+      tags: c.tags || [],
+      dateAdded: c.dateAdded,
+      dateUpdated: c.dateUpdated,
+    }));
+  });
+}
+
+async function listCalendars(brand) {
+  return rateLimited(async () => {
+    const res = await fetch(`https://services.leadconnectorhq.com/calendars/?locationId=${brand.locationId}`, {
+      headers: { Authorization: `Bearer ${brand.token}`, Version: '2021-07-28' },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`GHL ${res.status}: ${text.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return data.calendars || [];
+  });
+}
+
+async function getCalendarEvents(brand, calendarId, startMs, endMs) {
+  return rateLimited(() => withRetry(async () => {
+    const url = `https://services.leadconnectorhq.com/calendars/events?locationId=${brand.locationId}&calendarId=${calendarId}&startTime=${startMs}&endTime=${endMs}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${brand.token}`, Version: '2021-07-28' },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`GHL ${res.status}: ${text.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return data.events || [];
+  }));
+}
+
+module.exports = { countTag, countTagPair, countBotField, countAll, listByTag, listCalendars, getCalendarEvents };

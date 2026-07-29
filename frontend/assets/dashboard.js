@@ -373,5 +373,42 @@ async function init() {
   }
 }
 
-$('#refresh-btn')?.addEventListener('click', init);
+function fmtFechaHora(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  return d.toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderTimeline(marcas) {
+  const html = marcas.map(m => {
+    if (!m.citas.length) {
+      return `<div class="timeline-brand"><h3>${m.nombre} <span class="tl-count">0 citas</span></h3></div>`;
+    }
+    const rows = m.citas.map(c => `
+      <div class="timeline-row">
+        <span class="tl-fecha">${fmtFechaHora(c.fecha)}</span>
+        <span class="tl-nombre">${c.nombre}${c.verificado ? '' : ' <span class=\"tl-unverified\">(sin reserva de calendario verificable)</span>'}</span>
+        <span class="tl-status">${c.estadoCita || ''}</span>
+      </div>`).join('');
+    return `
+      <div class="timeline-brand">
+        <h3>${m.nombre} <span class="tl-count">${m.citas.length} citas</span></h3>
+        ${rows}
+      </div>`;
+  }).join('');
+  $('#timeline').innerHTML = html;
+}
+
+async function loadTimeline() {
+  try {
+    const data = await fetchJSON('/api/stats/timeline');
+    renderTimeline(data.marcas);
+  } catch (e) {
+    $('#timeline').innerHTML = `<div class="loading">Error cargando el timeline: ${e.message}</div>`;
+  }
+}
+
+$('#refresh-btn')?.addEventListener('click', () => { init(); loadTimeline(); });
 init();
+loadTimeline();

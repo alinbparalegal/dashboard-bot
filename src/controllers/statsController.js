@@ -49,4 +49,16 @@ async function getChannels(req, res) {
   }
 }
 
-module.exports = { getDailyTotals, getDailyDetail, getSummary, getChannels };
+async function getTimeline(req, res) {
+  try {
+    const hasta = req.query.hasta || statsService.todayStr();
+    const desde = req.query.desde || process.env.BOT_LAUNCH_DATE || hasta;
+    const data = await statsService.getCitasTimeline(desde, hasta);
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error en getTimeline:', error);
+    res.status(500).json({ message: error.message });
+  }
+}
+
+module.exports = { getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline };
