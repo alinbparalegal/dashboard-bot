@@ -271,7 +271,9 @@ function getChannelBreakdown(desde, hasta) {
 // verificable en GHL (el bot a veces marca el tag solo al enviar el enlace, sin confirmar que
 // la persona reservó de verdad) — ver conversación del 2026-07-29. Si no hay evento, se usa
 // dateUpdated del contacto como fecha aproximada y se marca verificado:false.
-const TIMELINE_TTL_MS = 15 * 60 * 1000;
+// 1h de TTL: esta consulta cuesta ~130 llamadas a GHL (~90s), y las citas no cambian
+// tan a menudo como para justificar recalcularla cada pocos minutos.
+const TIMELINE_TTL_MS = 60 * 60 * 1000;
 const timelineCache = new Map(); // "desde|hasta" -> { promise, expiresAt }
 
 async function computeCitasTimeline(desde, hasta) {

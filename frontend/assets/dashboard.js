@@ -400,7 +400,10 @@ function renderTimeline(marcas) {
   $('#timeline').innerHTML = html;
 }
 
-async function loadTimeline() {
+async function loadTimeline({ showLoading = false } = {}) {
+  if (showLoading) {
+    $('#timeline').innerHTML = '<div class="loading">Actualizando citas… (puede tardar un minuto)</div>';
+  }
   try {
     const data = await fetchJSON('/api/stats/timeline');
     renderTimeline(data.marcas);
@@ -409,6 +412,6 @@ async function loadTimeline() {
   }
 }
 
-$('#refresh-btn')?.addEventListener('click', () => { init(); loadTimeline(); });
+$('#refresh-btn')?.addEventListener('click', () => { init(); loadTimeline({ showLoading: true }); });
 init();
 loadTimeline();
