@@ -1,5 +1,23 @@
 const $ = sel => document.querySelector(sel);
 
+// Periodo seleccionado en las pestañas (Todo/Junio/Julio/...). null = por defecto (desde el
+// lanzamiento del bot hasta hoy). Se rellena la primera vez que llega la respuesta de /summary.
+const state = { desde: null, hasta: null, launchDate: null, tabsBuilt: false };
+
+// Combina el periodo seleccionado con parámetros extra (ej. force=true), en la misma query string.
+function apiQuery(extra = {}) {
+  const params = new URLSearchParams(extra);
+  if (state.desde) { params.set('desde', state.desde); params.set('hasta', state.hasta); }
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+// Formatea una fecha LOCAL como YYYY-MM-DD, sin pasar por toISOString() (que convierte a UTC
+// y puede desfasar un día según la zona horaria).
+function toDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function fmt(n) {
   return new Intl.NumberFormat('es-ES').format(n || 0);
 }
@@ -276,7 +294,7 @@ function loadCitasDonut(marcas) {
 }
 
 async function loadChannelsDonut(totalConversacion, force = false) {
-  const data = await fetchJSON(`/api/stats/channels${force ? '?force=true' : ''}`);
+  const data = await fetchJSON(`/api/stats/channels${apiQuery(force ? { force: 'true' } : {})}`);
   const c = themeColors();
   const labels = { canal_whatsapp: 'WhatsApp', canal_instagram: 'Instagram', canal_facebook: 'Facebook' };
   const colors = { canal_whatsapp: c.good, canal_instagram: c.cat5, canal_facebook: c.accent };
@@ -296,14 +314,58 @@ async function loadChannelsDonut(totalConversacion, force = false) {
   renderDonut('#donut-canal', entries, 'leads');
 }
 
+function monthName(m) {
+  return ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][m];
+}
+
+function buildPeriodTabs(launchDate) {
+  if (state.tabsBuilt) return;
+  state.tabsBuilt = true;
+  state.launchDate = launchDate;
+
+  const today = new Date();
+  const start = new Date(launchDate + 'T00:00:00');
+  const months = [];
+  let cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (cursor <= today) {
+    months.push({ year: cursor.getFullYear(), month: cursor.getMonth() });
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+  }
+
+  const tabs = [{ label: 'Todo', desde: null, hasta: null }];
+  months.forEach(({ year, month }) => {
+    const desde = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month + 1, 0);
+    const hastaDate = lastDay < today ? lastDay : today;
+    const hasta = toDateStr(hastaDate);
+    tabs.push({ label: monthName(month), desde, hasta });
+  });
+
+  $('#period-tabs').innerHTML = tabs.map((t, i) => `
+    <button class="period-tab${i === 0 ? ' active' : ''}" data-desde="${t.desde || ''}" data-hasta="${t.hasta || ''}">${t.label}</button>
+  `).join('');
+
+  $('#period-tabs').querySelectorAll('.period-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.desde = btn.dataset.desde || null;
+      state.hasta = btn.dataset.hasta || null;
+      $('#period-tabs').querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadPeriodData();
+      loadTimeline({ showLoading: true });
+    });
+  });
+}
+
 async function loadSummary() {
-  const summary = await fetchJSON('/api/stats/summary');
+  const summary = await fetchJSON(`/api/stats/summary${apiQuery()}`);
   renderKpis(summary.total);
   loadCitasDonut(summary.marcas);
   loadChannelsDonut(summary.total.conversacion);
   $('#brands').innerHTML = summary.marcas.map(renderBrandCard).join('');
   renderBrandCompare(summary.marcas);
   $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
+  buildPeriodTabs(summary.desde);
 }
 
 function colorForIntensity(v, max) {
@@ -359,15 +421,21 @@ async function showDayDetail(fecha) {
   }
 }
 
-async function init() {
-  const btn = $('#refresh-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '↻ Actualizando…'; }
+async function loadPeriodData() {
   $('#brands').innerHTML = '<div class="loading">Cargando dashboard…</div>';
   try {
-    await Promise.all([loadSummary(), loadHeatmap()]);
+    await loadSummary();
     $('#meta-actualizado').textContent = `Actualizado a las ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
   } catch (e) {
     $('#brands').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+  }
+}
+
+async function init() {
+  const btn = $('#refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Actualizando…'; }
+  try {
+    await Promise.all([loadPeriodData(), loadHeatmap()]);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '↻ Actualizar datos'; }
   }
@@ -418,7 +486,7 @@ async function loadTimeline({ showLoading = false, force = false } = {}) {
     $('#timeline').innerHTML = '<div class="loading">Actualizando citas… (puede tardar un minuto)</div>';
   }
   try {
-    const data = await fetchJSON(`/api/stats/timeline${force ? '?force=true' : ''}`);
+    const data = await fetchJSON(`/api/stats/timeline${apiQuery(force ? { force: 'true' } : {})}`);
     renderTimeline(data.marcas, data.computedAt);
   } catch (e) {
     $('#timeline').innerHTML = `<div class="loading">Error cargando el timeline: ${e.message}</div>`;

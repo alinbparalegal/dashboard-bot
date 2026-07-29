@@ -53,6 +53,15 @@ h1.title { font-size: 28px; font-weight: 600; }
 .subtitle { color: var(--ink-soft); font-size: 14px; }
 .meta-row { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 8px; font-size: 12.5px; color: var(--ink-faint); }
 
+.period-tabs { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
+.period-tab {
+  background: var(--surface); color: var(--ink-soft); border: 1px solid var(--border);
+  border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.period-tab:hover { border-color: var(--accent); }
+.period-tab.active { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.period-tab:disabled { opacity: 0.5; cursor: default; }
+
 /* KPI strip */
 .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border);
   border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 32px; box-shadow: var(--shadow); }
