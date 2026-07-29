@@ -89,8 +89,11 @@
     <section class="brands" id="brands" aria-label="Funnel por marca"></section>
 
     <section class="timeline-card">
-      <h2>Timeline de citas conseguidas</h2>
-      <p class="detail-intro">Fecha aproximada según el tag del bot; cuando hay una reserva real en el calendario de GHL se usa esa fecha exacta.</p>
+      <div class="header-top">
+        <h2>Timeline de citas conseguidas</h2>
+        <span id="timeline-computed-at" class="tl-computed"></span>
+      </div>
+      <p class="detail-intro">Fecha aproximada según el tag del bot; cuando hay una reserva real en el calendario de GHL se usa esa fecha exacta. El botón "Actualizar datos" siempre recalcula esta lista desde cero.</p>
       <div id="timeline"><div class="loading">Cargando citas… (puede tardar un minuto)</div></div>
     </section>
 

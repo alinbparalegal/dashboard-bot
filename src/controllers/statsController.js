@@ -41,7 +41,8 @@ async function getChannels(req, res) {
   try {
     const hasta = req.query.hasta || statsService.todayStr();
     const desde = req.query.desde || process.env.BOT_LAUNCH_DATE || hasta;
-    const data = await statsService.getChannelBreakdown(desde, hasta);
+    const force = req.query.force === 'true';
+    const data = await statsService.getChannelBreakdown(desde, hasta, force);
     res.status(200).json(data);
   } catch (error) {
     console.error('Error en getChannels:', error);
@@ -53,7 +54,8 @@ async function getTimeline(req, res) {
   try {
     const hasta = req.query.hasta || statsService.todayStr();
     const desde = req.query.desde || process.env.BOT_LAUNCH_DATE || hasta;
-    const data = await statsService.getCitasTimeline(desde, hasta);
+    const force = req.query.force === 'true';
+    const data = await statsService.getCitasTimeline(desde, hasta, force);
     res.status(200).json(data);
   } catch (error) {
     console.error('Error en getTimeline:', error);

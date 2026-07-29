@@ -172,6 +172,8 @@ h1.title { font-size: 28px; font-weight: 600; }
 /* Timeline de citas */
 .timeline-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 32px; box-shadow: var(--shadow); }
 .timeline-card h2 { font-size: 16px; }
+.timeline-card .header-top { margin-bottom: 0; align-items: baseline; }
+.tl-computed { font-size: 11px; color: var(--ink-faint); font-style: italic; white-space: nowrap; }
 .timeline-brand { margin-top: 16px; }
 .timeline-brand h3 { font-size: 13px; margin-bottom: 8px; display: flex; align-items: baseline; gap: 8px; }
 .timeline-brand h3 .tl-count { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); font-weight: 400; }

@@ -275,8 +275,8 @@ function loadCitasDonut(marcas) {
   renderDonut('#donut-citas', entries, 'citas');
 }
 
-async function loadChannelsDonut(totalConversacion) {
-  const data = await fetchJSON('/api/stats/channels');
+async function loadChannelsDonut(totalConversacion, force = false) {
+  const data = await fetchJSON(`/api/stats/channels${force ? '?force=true' : ''}`);
   const c = themeColors();
   const labels = { canal_whatsapp: 'WhatsApp', canal_instagram: 'Instagram', canal_facebook: 'Facebook' };
   const colors = { canal_whatsapp: c.good, canal_instagram: c.cat5, canal_facebook: c.accent };
@@ -379,8 +379,14 @@ function fmtFechaHora(iso) {
   if (isNaN(d)) return '—';
   return d.toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+function fmtHora(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
 
-function renderTimeline(marcas) {
+function renderTimeline(marcas, computedAt) {
+  $('#timeline-computed-at').textContent = computedAt ? `Calculado a las ${fmtHora(computedAt)}` : '';
   const html = marcas.map(m => {
     if (!m.citas.length) {
       return `<div class="timeline-brand"><h3>${m.nombre} <span class="tl-count">0 citas</span></h3></div>`;
@@ -400,18 +406,21 @@ function renderTimeline(marcas) {
   $('#timeline').innerHTML = html;
 }
 
-async function loadTimeline({ showLoading = false } = {}) {
+async function loadTimeline({ showLoading = false, force = false } = {}) {
   if (showLoading) {
     $('#timeline').innerHTML = '<div class="loading">Actualizando citas… (puede tardar un minuto)</div>';
   }
   try {
-    const data = await fetchJSON('/api/stats/timeline');
-    renderTimeline(data.marcas);
+    const data = await fetchJSON(`/api/stats/timeline${force ? '?force=true' : ''}`);
+    renderTimeline(data.marcas, data.computedAt);
   } catch (e) {
     $('#timeline').innerHTML = `<div class="loading">Error cargando el timeline: ${e.message}</div>`;
   }
 }
 
-$('#refresh-btn')?.addEventListener('click', () => { init(); loadTimeline({ showLoading: true }); });
+$('#refresh-btn')?.addEventListener('click', () => {
+  init();
+  loadTimeline({ showLoading: true, force: true });
+});
 init();
 loadTimeline();

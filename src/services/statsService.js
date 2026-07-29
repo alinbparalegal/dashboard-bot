@@ -254,13 +254,15 @@ async function computeChannelBreakdown(desde, hasta) {
     }
     return { marca: brand.code, nombre: brand.name, canales: counts };
   }));
-  return { desde, hasta, marcas: perBrand };
+  return { desde, hasta, marcas: perBrand, computedAt: new Date().toISOString() };
 }
 
-function getChannelBreakdown(desde, hasta) {
+// force=true salta la caché (usado por el botón "Actualizar datos"), para que un refresco
+// explícito del usuario siempre traiga el dato real y no uno ya desactualizado.
+function getChannelBreakdown(desde, hasta, force = false) {
   const key = `${desde}|${hasta}`;
   const cached = channelCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+  if (!force && cached && cached.expiresAt > Date.now()) return cached.promise;
   const promise = computeChannelBreakdown(desde, hasta);
   channelCache.set(key, { promise, expiresAt: Date.now() + CHANNEL_TTL_MS });
   return promise;
@@ -306,13 +308,15 @@ async function computeCitasTimeline(desde, hasta) {
 
     return { marca: brand.code, nombre: brand.name, citas };
   }));
-  return { desde, hasta, marcas: perBrand };
+  return { desde, hasta, marcas: perBrand, computedAt: new Date().toISOString() };
 }
 
-function getCitasTimeline(desde, hasta) {
+// force=true salta la caché (usado por el botón "Actualizar datos"), para que un refresco
+// explícito del usuario siempre traiga el dato real y no uno ya desactualizado.
+function getCitasTimeline(desde, hasta, force = false) {
   const key = `${desde}|${hasta}`;
   const cached = timelineCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+  if (!force && cached && cached.expiresAt > Date.now()) return cached.promise;
   const promise = computeCitasTimeline(desde, hasta);
   timelineCache.set(key, { promise, expiresAt: Date.now() + TIMELINE_TTL_MS });
   return promise;
