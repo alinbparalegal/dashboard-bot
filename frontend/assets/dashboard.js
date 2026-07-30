@@ -286,15 +286,14 @@ function renderDonut(containerId, entries, totalLabel) {
     </div>`;
 }
 
-function loadCitasDonut(marcas) {
+function renderCitasDonut(marcas) {
   const c = themeColors();
   const palette = [c.accent, c.warn, c.good, c.cat4, c.cat5];
   const entries = marcas.map((m, i) => ({ label: m.marca, value: m.etapa2_cita, color: palette[i % palette.length] }));
   renderDonut('#donut-citas', entries, 'citas');
 }
 
-async function loadChannelsDonut(totalConversacion, force = false) {
-  const data = await fetchJSON(`/api/stats/channels${apiQuery(force ? { force: 'true' } : {})}`);
+function renderChannelsDonut(data, totalConversacion) {
   const c = themeColors();
   const labels = { canal_whatsapp: 'WhatsApp', canal_instagram: 'Instagram', canal_facebook: 'Facebook' };
   const colors = { canal_whatsapp: c.good, canal_instagram: c.cat5, canal_facebook: c.accent };
@@ -351,6 +350,9 @@ function buildPeriodTabs(launchDate) {
     <button class="period-tab${i === 0 ? ' active' : ''}" data-desde="${t.desde || ''}" data-hasta="${t.hasta || ''}">${t.label}</button>
   `).join('');
 
+  // Cambiar de pestaña es puramente local: no pide nada a GHL. Si ese periodo ya se
+  // actualizó antes (está en el almacén local), se muestra al instante; si no, se pide
+  // pulsar "Actualizar datos" en vez de recalcular solo por haber hecho clic.
   $('#period-tabs').querySelectorAll('.period-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       state.desde = btn.dataset.desde || null;
@@ -358,22 +360,12 @@ function buildPeriodTabs(launchDate) {
       $('#period-tabs').querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       updateHeatmapTitles(btn.textContent);
-      loadPeriodData();
-      loadHeatmap();
-      loadTimeline({ showLoading: true });
+      store.activeTab = periodKey();
+      saveStore(store);
+      const cached = store.periods[periodKey()];
+      if (cached) renderBundle(cached); else renderPlaceholder();
     });
   });
-}
-
-async function loadSummary() {
-  const summary = await fetchJSON(`/api/stats/summary${apiQuery()}`);
-  renderKpis(summary.total);
-  loadCitasDonut(summary.marcas);
-  loadChannelsDonut(summary.total.conversacion);
-  $('#brands').innerHTML = summary.marcas.map(renderBrandCard).join('');
-  renderBrandCompare(summary.marcas);
-  $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
-  buildPeriodTabs(summary.desde);
 }
 
 function colorForIntensity(v, max) {
@@ -384,9 +376,7 @@ function colorForIntensity(v, max) {
   return `color-mix(in srgb, var(--accent) ${Math.round(alpha * 100)}%, var(--surface-alt))`;
 }
 
-async function loadHeatmap() {
-  // Con un mes seleccionado, muestra exactamente ese mes; con "Todo", los últimos 30 días.
-  const daily = await fetchJSON(`/api/stats/daily${apiQuery(state.desde ? {} : { days: '30' })}`);
+function renderHeatmapAndTrend(daily) {
   const max = Math.max(...daily.map(d => d.conversacion), 1);
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -406,6 +396,9 @@ async function loadHeatmap() {
   $('#trend-chart').innerHTML = buildTrendSvg(daily);
 }
 
+// Detalle de un día concreto del heatmap: se pide en el momento (acción explícita del
+// usuario al hacer clic), no forma parte del ciclo de "Actualizar datos". Los días ya
+// cerrados se leen de Mongo (gratis); solo "hoy" toca GHL.
 async function showDayDetail(fecha) {
   const panel = $('#day-detail');
   panel.classList.add('open');
@@ -427,26 +420,6 @@ async function showDayDetail(fecha) {
       </table>`;
   } catch (e) {
     panel.innerHTML = `<div class="loading">Error cargando ${fecha}: ${e.message}</div>`;
-  }
-}
-
-async function loadPeriodData() {
-  $('#brands').innerHTML = '<div class="loading">Cargando dashboard…</div>';
-  try {
-    await loadSummary();
-    $('#meta-actualizado').textContent = `Actualizado a las ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
-  } catch (e) {
-    $('#brands').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
-  }
-}
-
-async function init() {
-  const btn = $('#refresh-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '↻ Actualizando…'; }
-  try {
-    await Promise.all([loadPeriodData(), loadHeatmap()]);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '↻ Actualizar datos'; }
   }
 }
 
@@ -512,19 +485,6 @@ function renderUltimasCitas(marcas) {
     </div>`).join('');
 }
 
-async function loadTimeline({ showLoading = false, force = false } = {}) {
-  if (showLoading) {
-    $('#timeline').innerHTML = '<div class="loading">Actualizando citas… (puede tardar un minuto)</div>';
-  }
-  try {
-    const data = await fetchJSON(`/api/stats/timeline${apiQuery(force ? { force: 'true' } : {})}`);
-    renderTimeline(data.marcas, data.computedAt);
-    renderUltimasCitas(data.marcas);
-  } catch (e) {
-    $('#timeline').innerHTML = `<div class="loading">Error cargando el timeline: ${e.message}</div>`;
-  }
-}
-
 function renderCampanasTable(campanas) {
   if (!campanas.length) {
     $('#tabla-campanas').innerHTML = '<p class="bd-empty">Sin campañas con UTM en este periodo.</p>';
@@ -546,32 +506,137 @@ function renderCampanasTable(campanas) {
     ${rows}`;
 }
 
-async function loadAttribution(force = false) {
+function renderAttribution(data) {
+  $('#attribution-computed-at').textContent = data.computedAt ? `Calculado a las ${fmtHora(data.computedAt)}` : '';
+
+  const c = themeColors();
+  const palette = [c.accent, c.warn, c.good, c.cat4, c.cat5, c.faint];
+  const sorted = Object.entries(data.sessionSource).sort((a, b) => b[1] - a[1]);
+  const top = sorted.slice(0, 5);
+  const restTotal = sorted.slice(5).reduce((s, [, v]) => s + v, 0);
+  const entries = top.map(([label, value], i) => ({ label, value, color: palette[i % palette.length] }));
+  if (restTotal > 0) entries.push({ label: 'Otros', value: restTotal, color: c.faint });
+  renderDonut('#donut-sessionsource', entries, 'leads');
+
+  renderCampanasTable(data.campanas);
+}
+
+// ---------------------------------------------------------------------------------
+// Almacén local: guarda el último resultado de cada periodo en localStorage para que
+// cambiar de pestaña o recargar la página no pida nada nuevo a GHL — solo el botón
+// "Actualizar datos" trae datos frescos, con un enfriamiento de 15 minutos.
+// ---------------------------------------------------------------------------------
+const STORE_KEY = 'dashboardStore_v1';
+const COOLDOWN_MS = 15 * 60 * 1000;
+
+function loadStore() {
   try {
-    const data = await fetchJSON(`/api/stats/attribution${apiQuery(force ? { force: 'true' } : {})}`);
-    $('#attribution-computed-at').textContent = data.computedAt ? `Calculado a las ${fmtHora(data.computedAt)}` : '';
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* localStorage no disponible o corrupto: seguimos con uno vacío */ }
+  return { periods: {}, lastUpdateClickAt: 0 };
+}
+function saveStore() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* ignorar */ }
+}
+const store = loadStore();
 
-    const c = themeColors();
-    const palette = [c.accent, c.warn, c.good, c.cat4, c.cat5, c.faint];
-    const sorted = Object.entries(data.sessionSource).sort((a, b) => b[1] - a[1]);
-    const top = sorted.slice(0, 5);
-    const restTotal = sorted.slice(5).reduce((s, [, v]) => s + v, 0);
-    const entries = top.map(([label, value], i) => ({ label, value, color: palette[i % palette.length] }));
-    if (restTotal > 0) entries.push({ label: 'Otros', value: restTotal, color: c.faint });
-    renderDonut('#donut-sessionsource', entries, 'leads');
+function periodKey() {
+  return state.desde ? `${state.desde}_${state.hasta}` : 'todo';
+}
 
-    renderCampanasTable(data.campanas);
+async function fetchBundle() {
+  const [summary, daily, channels, timeline, attribution] = await Promise.all([
+    fetchJSON(`/api/stats/summary${apiQuery()}`),
+    fetchJSON(`/api/stats/daily${apiQuery(state.desde ? {} : { days: '30' })}`),
+    fetchJSON(`/api/stats/channels${apiQuery({ force: 'true' })}`),
+    fetchJSON(`/api/stats/timeline${apiQuery({ force: 'true' })}`),
+    fetchJSON(`/api/stats/attribution${apiQuery({ force: 'true' })}`),
+  ]);
+  return { summary, daily, channels, timeline, attribution, fetchedAt: new Date().toISOString() };
+}
+
+function renderBundle(bundle) {
+  const { summary, daily, channels, timeline, attribution, fetchedAt } = bundle;
+  renderKpis(summary.total);
+  renderCitasDonut(summary.marcas);
+  renderChannelsDonut(channels, summary.total.conversacion);
+  $('#brands').innerHTML = summary.marcas.map(renderBrandCard).join('');
+  renderBrandCompare(summary.marcas);
+  $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
+  renderHeatmapAndTrend(daily);
+  renderTimeline(timeline.marcas, timeline.computedAt);
+  renderUltimasCitas(timeline.marcas);
+  renderAttribution(attribution);
+  $('#meta-actualizado').textContent = fetchedAt ? `Actualizado a las ${fmtHora(fetchedAt)}` : '';
+  buildPeriodTabs(summary.desde);
+}
+
+function renderPlaceholder() {
+  const msg = '<div class="loading">Pulsa "Actualizar datos" para cargar este periodo.</div>';
+  ['#brands', '#donut-citas', '#donut-canal', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas']
+    .forEach(sel => { $(sel).innerHTML = msg; });
+  $('#heatmap-grid').innerHTML = '';
+  $('#trend-chart').innerHTML = '';
+  $('#brand-compare').innerHTML = '';
+  $('#kpi-conversacion').textContent = '—';
+  $('#kpi-cualificado').textContent = '—';
+  $('#kpi-cita').textContent = '—';
+  $('#kpi-ingreso').textContent = '—';
+  $('#meta-periodo').textContent = 'Periodo: —';
+}
+
+function cooldownRemaining() {
+  return Math.max(0, COOLDOWN_MS - (Date.now() - (store.lastUpdateClickAt || 0)));
+}
+
+let cooldownTimer = null;
+function tickCooldown() {
+  const btn = $('#refresh-btn');
+  if (!btn) return;
+  const remaining = cooldownRemaining();
+  if (remaining <= 0) {
+    btn.disabled = false;
+    btn.textContent = '↻ Actualizar datos';
+    if (cooldownTimer) { clearInterval(cooldownTimer); cooldownTimer = null; }
+    return;
+  }
+  btn.disabled = true;
+  const secs = Math.ceil(remaining / 1000);
+  btn.textContent = `↻ Disponible en ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+}
+function startCooldownUI() {
+  tickCooldown();
+  if (!cooldownTimer) cooldownTimer = setInterval(tickCooldown, 1000);
+}
+
+async function updateNow() {
+  if (cooldownRemaining() > 0) return;
+  const btn = $('#refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Actualizando… (puede tardar 1-2 min)'; }
+  $('#brands').innerHTML = '<div class="loading">Cargando dashboard…</div>';
+  try {
+    const bundle = await fetchBundle();
+    store.periods[periodKey()] = bundle;
+    store.lastUpdateClickAt = Date.now();
+    saveStore();
+    renderBundle(bundle);
   } catch (e) {
-    $('#donut-sessionsource').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
-    $('#tabla-campanas').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+    $('#brands').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+  } finally {
+    startCooldownUI();
   }
 }
 
-$('#refresh-btn')?.addEventListener('click', () => {
-  init();
-  loadTimeline({ showLoading: true, force: true });
-  loadAttribution(true);
-});
+function init() {
+  const cached = store.periods['todo'];
+  if (cached) {
+    renderBundle(cached);
+  } else {
+    updateNow();
+  }
+  startCooldownUI();
+}
+
+$('#refresh-btn')?.addEventListener('click', updateNow);
 init();
-loadTimeline();
-loadAttribution();
