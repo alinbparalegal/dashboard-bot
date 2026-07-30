@@ -268,14 +268,12 @@ function getChannelBreakdown(desde, hasta, force = false) {
   return promise;
 }
 
-// Timeline de citas (tag consulta_agendada) por marca, con nombre y fecha. Se cruza con los
-// eventos de TODOS los calendarios de la marca para saber si la cita tiene una reserva real
-// verificable en GHL (el bot a veces marca el tag solo al enviar el enlace, sin confirmar que
-// la persona reservó de verdad) — ver conversación del 2026-07-29. Si no hay evento, se usa
-// dateUpdated del contacto como fecha aproximada y se marca verificado:false.
-// 1h de TTL: esta consulta cuesta ~130 llamadas a GHL (~90s), y las citas no cambian
-// tan a menudo como para justificar recalcularla cada pocos minutos.
-const TIMELINE_TTL_MS = 60 * 60 * 1000;
+// Timeline de citas (tag consulta_agendada) por marca, con nombre y fecha. La verificación ya
+// NO cruza contra los calendarios de GHL (~130 llamadas, ~90s) — se validó a mano (2026-07-30,
+// en las 4 marcas principales) que el tag `pago info` coincide al 100% con una cita/pago real
+// confirmado (y con el campo "Fecha de Pago" no vacío), tanto si gestiona el bot como un humano.
+// Mucho más barato y, según la validación, igual de fiable que el cruce con calendarios.
+const TIMELINE_TTL_MS = 3 * 60 * 1000;
 const timelineCache = new Map(); // "desde|hasta" -> { promise, expiresAt }
 
 async function computeCitasTimeline(desde, hasta) {
@@ -283,32 +281,32 @@ async function computeCitasTimeline(desde, hasta) {
   const perBrand = await Promise.all(brands.map(async brand => {
     const contactos = await ghl.listByTag(brand, 'consulta_agendada', desde, hasta);
 
-    const calendars = await ghl.listCalendars(brand);
-    const startMs = new Date(desde).getTime();
-    const endMs = new Date(hasta).getTime() + 120 * 24 * 60 * 60 * 1000; // +120 días, por si la cita real cae más adelante
-    const eventByContact = new Map();
-    for (const cal of calendars) {
-      const events = await ghl.getCalendarEvents(brand, cal.id, startMs, endMs);
-      for (const ev of events) {
-        if (!eventByContact.has(ev.contactId)) {
-          eventByContact.set(ev.contactId, { fecha: ev.startTime, estado: ev.appointmentStatus, calendario: cal.name });
-        }
-      }
-    }
+    // "Gestionado por" indica quién cerró la cita: el bot en automático, o un humano tras
+    // escalar la conversación. Es un campo (no tag), hay que pedir el contacto completo.
+    const detalles = await Promise.all(contactos.map(c => ghl.getContact(brand, c.id)));
+    const gestionadoPorDe = detalle => {
+      const cf = (detalle?.customFields || []).find(f => f.id === brand.botFieldId);
+      return cf?.value || null;
+    };
 
-    const citas = contactos.map(c => {
-      const ev = eventByContact.get(c.id);
+    const citas = contactos.map((c, i) => {
+      const gestionadoPor = gestionadoPorDe(detalles[i]);
       return {
         nombre: c.nombre,
         // Fecha de creación del lead, igual criterio que el resto del dashboard (heatmap, etc.)
         fecha: c.dateAdded,
-        fechaCitaReal: ev ? ev.fecha : null,
-        estadoCita: ev ? ev.estado : null,
-        verificado: !!ev,
+        verificado: c.tags.includes('pago info'),
+        gestionadoPor,
+        esBot: gestionadoPor === 'BOT',
       };
     }).sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 
-    return { marca: brand.code, nombre: brand.name, citas };
+    const resumenGestion = citas.reduce((acc, c) => {
+      if (c.esBot) acc.bot++; else if (c.gestionadoPor) acc.humano++; else acc.desconocido++;
+      return acc;
+    }, { bot: 0, humano: 0, desconocido: 0 });
+
+    return { marca: brand.code, nombre: brand.name, citas, resumenGestion };
   }));
   return { desde, hasta, marcas: perBrand, computedAt: new Date().toISOString() };
 }

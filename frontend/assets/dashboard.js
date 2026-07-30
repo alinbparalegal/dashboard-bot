@@ -441,12 +441,6 @@ async function init() {
   }
 }
 
-function fmtFechaHora(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (isNaN(d)) return '—';
-  return d.toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
 function fmtHora(iso) {
   const d = new Date(iso);
   if (isNaN(d)) return '—';
@@ -464,17 +458,25 @@ function renderTimeline(marcas, computedAt) {
     if (!m.citas.length) {
       return `<div class="timeline-brand"><h3>${m.nombre} <span class="tl-count">0 citas</span></h3></div>`;
     }
+    const g = m.resumenGestion || {};
+    const resumenBits = [
+      g.bot ? `${g.bot} por el bot` : null,
+      g.humano ? `${g.humano} por un humano` : null,
+      g.desconocido ? `${g.desconocido} sin dato` : null,
+    ].filter(Boolean).join(' · ');
     const rows = m.citas.map(c => `
       <div class="timeline-row">
         <span class="tl-fecha">${fmtFecha(c.fecha)}</span>
         <span class="tl-nombre">${c.nombre}</span>
+        <span class="tl-gestion">${c.esBot ? 'bot' : (c.gestionadoPor || '—')}</span>
         <span class="tl-status">${c.verificado
-          ? `cita real: ${fmtFechaHora(c.fechaCitaReal)} · ${c.estadoCita || ''}`
-          : '<span class="tl-unverified">sin reserva de calendario verificable</span>'}</span>
+          ? 'pago/cita confirmado'
+          : '<span class="tl-unverified">sin confirmación de pago registrada</span>'}</span>
       </div>`).join('');
     return `
       <div class="timeline-brand">
         <h3>${m.nombre} <span class="tl-count">${m.citas.length} citas</span></h3>
+        ${resumenBits ? `<p class="tl-resumen-gestion">${resumenBits}</p>` : ''}
         ${rows}
       </div>`;
   }).join('');

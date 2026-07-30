@@ -186,13 +186,15 @@ h1.title { font-size: 28px; font-weight: 600; }
 .timeline-brand { margin-top: 16px; }
 .timeline-brand h3 { font-size: 13px; margin-bottom: 8px; display: flex; align-items: baseline; gap: 8px; }
 .timeline-brand h3 .tl-count { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); font-weight: 400; }
-.timeline-row { display: grid; grid-template-columns: 130px 1fr auto; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.tl-resumen-gestion { font-size: 11px; color: var(--ink-soft); margin: -2px 0 6px; }
+.timeline-row { display: grid; grid-template-columns: 110px 1fr 70px auto; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
 .timeline-row:last-child { border-bottom: none; }
 .timeline-row .tl-fecha { font-family: ui-monospace, monospace; color: var(--ink-soft); white-space: nowrap; }
 .timeline-row .tl-nombre { text-transform: capitalize; }
+.timeline-row .tl-gestion { font-size: 10.5px; color: var(--ink-faint); text-transform: capitalize; }
 .timeline-row .tl-unverified { font-size: 10.5px; color: var(--warn); font-style: italic; }
 .timeline-row .tl-status { font-size: 10px; text-transform: uppercase; color: var(--ink-faint); font-family: ui-monospace, monospace; }
-@media (max-width: 520px) { .timeline-row { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .timeline-row { grid-template-columns: 1fr; } }
 
 footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--ink-faint); }
 .loading { color: var(--ink-faint); font-style: italic; padding: 20px 0; }
