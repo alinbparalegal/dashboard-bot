@@ -461,7 +461,7 @@ function renderTimeline(marcas, computedAt) {
     const g = m.resumenGestion || {};
     const resumenBits = [
       g.bot ? `${g.bot} por el bot` : null,
-      g.humano ? `${g.humano} por un humano` : null,
+      g.humano ? `${g.humano} escaladas a humano` : null,
       g.desconocido ? `${g.desconocido} sin dato` : null,
     ].filter(Boolean).join(' · ');
     const rows = m.citas.map(c => `
