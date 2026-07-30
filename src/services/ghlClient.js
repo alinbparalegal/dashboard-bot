@@ -134,4 +134,52 @@ async function getContact(brand, contactId) {
   });
 }
 
-module.exports = { countTag, countTagPair, countBotField, countAll, listByTag, getContact };
+// Trae TODOS los contactos que tengan al menos uno de `tags` (operador contains_set = OR),
+// paginando con searchAfter. Se usa para el análisis de procedencia (sessionSource/campaña),
+// que no se puede filtrar en el propio GHL — hay que leerlo contacto a contacto.
+async function listByAnyTag(brand, tags, gte, lte) {
+  const all = [];
+  let searchAfter;
+  while (true) {
+    const contacts = await rateLimited(async () => {
+      const body = {
+        locationId: brand.locationId,
+        pageLimit: 100,
+        filters: [
+          { field: 'tags', operator: 'contains_set', value: tags },
+          dateRangeFilter(gte, lte),
+        ],
+        sort: [{ field: 'dateAdded', direction: 'asc' }],
+      };
+      if (searchAfter) body.searchAfter = searchAfter;
+      const res = await fetch(GHL_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${brand.token}`,
+          Version: '2021-07-28',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`GHL ${res.status}: ${text.slice(0, 300)}`);
+      }
+      const data = await res.json();
+      return data.contacts || [];
+    });
+
+    if (!contacts.length) break;
+    all.push(...contacts.map(c => ({
+      tags: c.tags || [],
+      sessionSource: c.attributionSource?.sessionSource || null,
+      campaign: c.attributionSource?.campaign || null,
+    })));
+    if (contacts.length < 100) break;
+    const last = contacts[contacts.length - 1];
+    searchAfter = [new Date(last.dateAdded).getTime(), last.id];
+  }
+  return all;
+}
+
+module.exports = { countTag, countTagPair, countBotField, countAll, listByTag, getContact, listByAnyTag };

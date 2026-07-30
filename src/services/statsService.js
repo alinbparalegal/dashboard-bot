@@ -104,15 +104,27 @@ function stageTotals(d) {
   };
 }
 
-// Serie diaria agregada (5 marcas sumadas) para el heatmap y la gráfica de tendencia,
-// terminando hoy. Incluye el desglose por etapa (no solo Conversación).
-async function getDailyTotals(days = 30) {
-  const dates = [];
-  const now = new Date();
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    dates.push(d.toISOString().slice(0, 10));
+// Serie diaria agregada (5 marcas sumadas) para el heatmap y la gráfica de tendencia. Si se
+// pasan desde/hasta (ej. una pestaña de mes concreto), la serie cubre exactamente ese rango;
+// si no, cubre los últimos `days` días terminando hoy (comportamiento por defecto de "Todo").
+async function getDailyTotals({ days = 30, desde, hasta } = {}) {
+  let dates;
+  if (desde && hasta) {
+    dates = [];
+    const cursor = new Date(desde);
+    const end = new Date(hasta);
+    while (cursor <= end) {
+      dates.push(cursor.toISOString().slice(0, 10));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  } else {
+    dates = [];
+    const now = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      dates.push(d.toISOString().slice(0, 10));
+    }
   }
 
   const closedDates = dates.filter(f => !isToday(f));
@@ -125,7 +137,8 @@ async function getDailyTotals(days = 30) {
   // antiguos (esos ya se rellenan a mano si hace falta, ver backfillDailyStats.js).
   const datesWithData = new Set(stored.map(d => d.fecha));
   const recentCutoff = closedDates.length > 10 ? closedDates[closedDates.length - 10] : closedDates[0];
-  const missingDates = closedDates.filter(f => !datesWithData.has(f) && f >= (recentCutoff || f));
+  const botLaunch = process.env.BOT_LAUNCH_DATE || '0000-00-00';
+  const missingDates = closedDates.filter(f => !datesWithData.has(f) && f >= (recentCutoff || f) && f >= botLaunch);
   if (missingDates.length) {
     const brands = getBrands();
     const repaired = await Promise.all(
@@ -338,6 +351,52 @@ function getCitasTimeline(desde, hasta, force = false) {
   return promise;
 }
 
+// Procedencia (sessionSource) y rendimiento por campaña de pago (utm campaign), sobre la
+// población real del funnel (contactos con alguno de los 6 tags de estado del bot). GHL no
+// permite filtrar por sessionSource en la propia API, así que hay que recorrer contacto a
+// contacto (paginado) — es la consulta más cara del dashboard, de ahí el TTL largo.
+const ATTRIBUTION_TTL_MS = 20 * 60 * 1000;
+const attributionCache = new Map(); // "desde|hasta" -> { promise, expiresAt }
+
+function normalizaCampana(nombre) {
+  return nombre.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+async function computeAttribution(desde, hasta) {
+  const brands = getBrands();
+  const sessionTotals = {};
+  const campanas = new Map(); // key normalizado -> { nombre, leads, cualificados, citas }
+
+  await Promise.all(brands.map(async brand => {
+    const contactos = await ghl.listByAnyTag(brand, ESTADO_TAGS, desde, hasta);
+    contactos.forEach(c => {
+      const src = c.sessionSource || 'Desconocido';
+      sessionTotals[src] = (sessionTotals[src] || 0) + 1;
+
+      if (c.campaign) {
+        const key = normalizaCampana(c.campaign);
+        if (!campanas.has(key)) campanas.set(key, { nombre: c.campaign.trim(), leads: 0, cualificados: 0, citas: 0 });
+        const entry = campanas.get(key);
+        entry.leads++;
+        if (c.tags.some(t => ['lead_potencial', 'pago_pendiente', 'consulta_agendada', 'cliente_postventa'].includes(t))) entry.cualificados++;
+        if (c.tags.includes('consulta_agendada')) entry.citas++;
+      }
+    });
+  }));
+
+  const campanasArr = [...campanas.values()].sort((a, b) => b.leads - a.leads);
+  return { desde, hasta, sessionSource: sessionTotals, campanas: campanasArr, computedAt: new Date().toISOString() };
+}
+
+function getAttribution(desde, hasta, force = false) {
+  const key = `${desde}|${hasta}`;
+  const cached = attributionCache.get(key);
+  if (!force && cached && cached.expiresAt > Date.now()) return cached.promise;
+  const promise = computeAttribution(desde, hasta);
+  attributionCache.set(key, { promise, expiresAt: Date.now() + ATTRIBUTION_TTL_MS });
+  return promise;
+}
+
 module.exports = {
   computeDailyStatsForBrand,
   upsertDailyStats,
@@ -347,5 +406,6 @@ module.exports = {
   getSummary,
   getChannelBreakdown,
   getCitasTimeline,
+  getAttribution,
   todayStr,
 };

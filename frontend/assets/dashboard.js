@@ -318,6 +318,12 @@ function monthName(m) {
   return ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][m];
 }
 
+function updateHeatmapTitles(tabLabel) {
+  const suffix = tabLabel === 'Todo' ? 'últimos 30 días' : tabLabel;
+  $('#heatmap-title').textContent = `Leads tratados — ${suffix}`;
+  $('#trend-title').textContent = `Tendencia — ${suffix}`;
+}
+
 function buildPeriodTabs(launchDate) {
   if (state.tabsBuilt) return;
   state.tabsBuilt = true;
@@ -351,7 +357,9 @@ function buildPeriodTabs(launchDate) {
       state.hasta = btn.dataset.hasta || null;
       $('#period-tabs').querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      updateHeatmapTitles(btn.textContent);
       loadPeriodData();
+      loadHeatmap();
       loadTimeline({ showLoading: true });
     });
   });
@@ -377,7 +385,8 @@ function colorForIntensity(v, max) {
 }
 
 async function loadHeatmap() {
-  const daily = await fetchJSON('/api/stats/daily?days=30');
+  // Con un mes seleccionado, muestra exactamente ese mes; con "Todo", los últimos 30 días.
+  const daily = await fetchJSON(`/api/stats/daily${apiQuery(state.desde ? {} : { days: '30' })}`);
   const max = Math.max(...daily.map(d => d.conversacion), 1);
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -483,6 +492,26 @@ function renderTimeline(marcas, computedAt) {
   $('#timeline').innerHTML = html;
 }
 
+function renderUltimasCitas(marcas) {
+  const todas = marcas.flatMap(m => m.citas.map(c => ({ ...c, marca: m.marca })));
+  todas.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const ultimas = todas.slice(0, 10);
+
+  if (!ultimas.length) {
+    $('#ultimas-citas').innerHTML = '<p class="bd-empty">Sin citas todavía.</p>';
+    return;
+  }
+
+  $('#ultimas-citas').innerHTML = ultimas.map(c => `
+    <div class="lc-row">
+      <span class="lc-fecha">${fmtFecha(c.fecha)}</span>
+      <span class="lc-marca">${c.marca}</span>
+      <span class="lc-nombre">${c.nombre}</span>
+      <span class="lc-gestion">${c.esBot ? 'bot' : (c.gestionadoPor || '—')}</span>
+      <span class="lc-status">${c.verificado ? 'confirmado' : '<span class="lc-unverified">sin confirmar</span>'}</span>
+    </div>`).join('');
+}
+
 async function loadTimeline({ showLoading = false, force = false } = {}) {
   if (showLoading) {
     $('#timeline').innerHTML = '<div class="loading">Actualizando citas… (puede tardar un minuto)</div>';
@@ -490,14 +519,59 @@ async function loadTimeline({ showLoading = false, force = false } = {}) {
   try {
     const data = await fetchJSON(`/api/stats/timeline${apiQuery(force ? { force: 'true' } : {})}`);
     renderTimeline(data.marcas, data.computedAt);
+    renderUltimasCitas(data.marcas);
   } catch (e) {
     $('#timeline').innerHTML = `<div class="loading">Error cargando el timeline: ${e.message}</div>`;
+  }
+}
+
+function renderCampanasTable(campanas) {
+  if (!campanas.length) {
+    $('#tabla-campanas').innerHTML = '<p class="bd-empty">Sin campañas con UTM en este periodo.</p>';
+    return;
+  }
+  const rows = campanas.slice(0, 15).map(c => {
+    const tasa = c.leads ? (c.citas / c.leads * 100) : 0;
+    return `
+    <div class="campana-row">
+      <span class="cp-nombre" title="${c.nombre}">${c.nombre}</span>
+      <span class="cp-num">${fmt(c.leads)}</span>
+      <span class="cp-num">${fmt(c.cualificados)}</span>
+      <span class="cp-num">${fmt(c.citas)}</span>
+      <span class="cp-tasa${c.citas === 0 ? ' cero' : ''}">${pct(tasa)} %</span>
+    </div>`;
+  }).join('');
+  $('#tabla-campanas').innerHTML = `
+    <div class="campana-head"><span>Campaña</span><span>Leads</span><span>Cualif.</span><span>Citas</span><span>Tasa</span></div>
+    ${rows}`;
+}
+
+async function loadAttribution(force = false) {
+  try {
+    const data = await fetchJSON(`/api/stats/attribution${apiQuery(force ? { force: 'true' } : {})}`);
+    $('#attribution-computed-at').textContent = data.computedAt ? `Calculado a las ${fmtHora(data.computedAt)}` : '';
+
+    const c = themeColors();
+    const palette = [c.accent, c.warn, c.good, c.cat4, c.cat5, c.faint];
+    const sorted = Object.entries(data.sessionSource).sort((a, b) => b[1] - a[1]);
+    const top = sorted.slice(0, 5);
+    const restTotal = sorted.slice(5).reduce((s, [, v]) => s + v, 0);
+    const entries = top.map(([label, value], i) => ({ label, value, color: palette[i % palette.length] }));
+    if (restTotal > 0) entries.push({ label: 'Otros', value: restTotal, color: c.faint });
+    renderDonut('#donut-sessionsource', entries, 'leads');
+
+    renderCampanasTable(data.campanas);
+  } catch (e) {
+    $('#donut-sessionsource').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+    $('#tabla-campanas').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
   }
 }
 
 $('#refresh-btn')?.addEventListener('click', () => {
   init();
   loadTimeline({ showLoading: true, force: true });
+  loadAttribution(true);
 });
 init();
 loadTimeline();
+loadAttribution();

@@ -3,7 +3,8 @@ const statsService = require('../services/statsService');
 async function getDailyTotals(req, res) {
   try {
     const days = parseInt(req.query.days, 10) || 30;
-    const data = await statsService.getDailyTotals(days);
+    const { desde, hasta } = req.query;
+    const data = await statsService.getDailyTotals({ days, desde, hasta });
     res.status(200).json(data);
   } catch (error) {
     console.error('Error en getDailyTotals:', error);
@@ -63,4 +64,17 @@ async function getTimeline(req, res) {
   }
 }
 
-module.exports = { getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline };
+async function getAttribution(req, res) {
+  try {
+    const hasta = req.query.hasta || statsService.todayStr();
+    const desde = req.query.desde || process.env.BOT_LAUNCH_DATE || hasta;
+    const force = req.query.force === 'true';
+    const data = await statsService.getAttribution(desde, hasta, force);
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error en getAttribution:', error);
+    res.status(500).json({ message: error.message });
+  }
+}
+
+module.exports = { getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution };

@@ -196,6 +196,29 @@ h1.title { font-size: 28px; font-weight: 600; }
 .timeline-row .tl-status { font-size: 10px; text-transform: uppercase; color: var(--ink-faint); font-family: ui-monospace, monospace; }
 @media (max-width: 560px) { .timeline-row { grid-template-columns: 1fr; } }
 
+/* Últimas 10 citas */
+.last-citas-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 32px; box-shadow: var(--shadow); }
+.last-citas-card h2 { font-size: 16px; margin-bottom: 12px; }
+.lc-row { display: grid; grid-template-columns: 110px 50px 1fr 90px auto; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.lc-row:last-child { border-bottom: none; }
+.lc-row .lc-fecha { font-family: ui-monospace, monospace; color: var(--ink-soft); white-space: nowrap; }
+.lc-row .lc-marca { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); background: var(--surface-alt); padding: 2px 6px; border-radius: 4px; text-align: center; }
+.lc-row .lc-nombre { text-transform: capitalize; }
+.lc-row .lc-gestion { font-size: 10.5px; color: var(--ink-faint); text-transform: capitalize; }
+.lc-row .lc-status { font-size: 10px; text-transform: uppercase; color: var(--ink-faint); font-family: ui-monospace, monospace; text-align: right; }
+.lc-row .lc-unverified { color: var(--warn); }
+@media (max-width: 640px) { .lc-row { grid-template-columns: 1fr; } }
+
+/* Tabla de rendimiento por campaña */
+.campana-row { display: grid; grid-template-columns: 1fr 55px 55px 45px 55px; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.campana-row:last-child { border-bottom: none; }
+.campana-head { display: grid; grid-template-columns: 1fr 55px 55px 45px 55px; gap: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-faint); padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+.campana-row .cp-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.campana-row .cp-num { font-family: ui-monospace, monospace; text-align: right; color: var(--ink-soft); }
+.campana-row .cp-tasa { font-family: ui-monospace, monospace; text-align: right; font-weight: 600; }
+.campana-row .cp-tasa.cero { color: var(--warn); }
+@media (max-width: 640px) { .campana-row, .campana-head { grid-template-columns: 1fr 45px 45px 45px; } .campana-head span:nth-child(4), .campana-row span:nth-child(4) { display: none; } }
+
 footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--ink-faint); }
 .loading { color: var(--ink-faint); font-style: italic; padding: 20px 0; }
 
