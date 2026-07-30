@@ -118,6 +118,22 @@ async function getDailyTotals(days = 30) {
   const closedDates = dates.filter(f => !isToday(f));
   const stored = await DailyStat.find({ fecha: { $in: closedDates } }).lean();
 
+  // Autorreparación: si un día cerrado reciente no tiene NINGÚN documento guardado (el cron
+  // nocturno no llegó a ejecutarse esa noche — típico si el servicio estuvo dormido/reiniciado
+  // justo a esa hora), se recalcula y se guarda ahora mismo, en vez de mostrarlo como 0 en el
+  // heatmap. Acotado a los últimos 10 días para no disparar recálculos caros sobre huecos
+  // antiguos (esos ya se rellenan a mano si hace falta, ver backfillDailyStats.js).
+  const datesWithData = new Set(stored.map(d => d.fecha));
+  const recentCutoff = closedDates.length > 10 ? closedDates[closedDates.length - 10] : closedDates[0];
+  const missingDates = closedDates.filter(f => !datesWithData.has(f) && f >= (recentCutoff || f));
+  if (missingDates.length) {
+    const brands = getBrands();
+    const repaired = await Promise.all(
+      missingDates.flatMap(fecha => brands.map(b => upsertDailyStats(b.code, fecha)))
+    );
+    stored.push(...repaired);
+  }
+
   const byDate = {};
   for (const f of dates) byDate[f] = { conversacion: 0, cualificado: 0, cita: 0 };
   for (const doc of stored) {
