@@ -350,9 +350,10 @@ function buildPeriodTabs(launchDate) {
     <button class="period-tab${i === 0 ? ' active' : ''}" data-desde="${t.desde || ''}" data-hasta="${t.hasta || ''}">${t.label}</button>
   `).join('');
 
-  // Cambiar de pestaña es puramente local: no pide nada a GHL. Si ese periodo ya se
-  // actualizó antes (está en el almacén local), se muestra al instante; si no, se pide
-  // pulsar "Actualizar datos" en vez de recalcular solo por haber hecho clic.
+  // Cambiar de pestaña ya no depende de haberla actualizado antes: canales/timeline/
+  // atribución se componen sumando lo guardado día a día en Mongo (barato, sin GHL en vivo
+  // salvo "hoy"), así que se puede pedir el periodo al vuelo. Si ya había una versión en
+  // caché se muestra al instante (cero lag) mientras se refresca en segundo plano.
   $('#period-tabs').querySelectorAll('.period-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       state.desde = btn.dataset.desde || null;
@@ -364,6 +365,7 @@ function buildPeriodTabs(launchDate) {
       saveStore(store);
       const cached = store.periods[periodKey()];
       if (cached) renderBundle(cached); else renderPlaceholder();
+      loadPeriod();
     });
   });
 }
@@ -545,15 +547,35 @@ function periodKey() {
   return state.desde ? `${state.desde}_${state.hasta}` : 'todo';
 }
 
-async function fetchBundle() {
+// canales/timeline/atribución ya se componen sumando lo guardado día a día en Mongo (barato,
+// nada de GHL salvo "hoy"), así que cambiar de pestaña puede pedirlos sin miedo. force=true
+// (solo desde "Actualizar datos") además refresca el día de hoy en vez de servir su caché de
+// 3 min — de ahí el enfriamiento del botón, para no forzar esa parte en vivo sin necesidad.
+async function fetchBundle(force = false) {
+  const forceQuery = force ? { force: 'true' } : {};
   const [summary, daily, channels, timeline, attribution] = await Promise.all([
     fetchJSON(`/api/stats/summary${apiQuery()}`),
     fetchJSON(`/api/stats/daily${apiQuery(state.desde ? {} : { days: '30' })}`),
-    fetchJSON(`/api/stats/channels${apiQuery({ force: 'true' })}`),
-    fetchJSON(`/api/stats/timeline${apiQuery({ force: 'true' })}`),
-    fetchJSON(`/api/stats/attribution${apiQuery({ force: 'true' })}`),
+    fetchJSON(`/api/stats/channels${apiQuery(forceQuery)}`),
+    fetchJSON(`/api/stats/timeline${apiQuery(forceQuery)}`),
+    fetchJSON(`/api/stats/attribution${apiQuery(forceQuery)}`),
   ]);
   return { summary, daily, channels, timeline, attribution, fetchedAt: new Date().toISOString() };
+}
+
+// Carga (no forzada) el periodo actualmente seleccionado y actualiza su caché local. Se usa
+// al cambiar de pestaña: como ya no depende de GHL en vivo (salvo "hoy"), no hace falta
+// esperar a "Actualizar datos" para ver un periodo por primera vez.
+async function loadPeriod() {
+  const key = periodKey();
+  try {
+    const bundle = await fetchBundle(false);
+    store.periods[key] = bundle;
+    saveStore();
+    if (periodKey() === key) renderBundle(bundle);
+  } catch (e) {
+    if (periodKey() === key) $('#brands').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+  }
 }
 
 function renderBundle(bundle) {
@@ -573,7 +595,7 @@ function renderBundle(bundle) {
 }
 
 function renderPlaceholder() {
-  const msg = '<div class="loading">Pulsa "Actualizar datos" para cargar este periodo.</div>';
+  const msg = '<div class="loading">Cargando…</div>';
   ['#brands', '#donut-citas', '#donut-canal', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas']
     .forEach(sel => { $(sel).innerHTML = msg; });
   $('#heatmap-grid').innerHTML = '';
@@ -613,10 +635,10 @@ function startCooldownUI() {
 async function updateNow() {
   if (cooldownRemaining() > 0) return;
   const btn = $('#refresh-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '↻ Actualizando… (puede tardar 1-2 min)'; }
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Actualizando…'; }
   $('#brands').innerHTML = '<div class="loading">Cargando dashboard…</div>';
   try {
-    const bundle = await fetchBundle();
+    const bundle = await fetchBundle(true);
     store.periods[periodKey()] = bundle;
     store.lastUpdateClickAt = Date.now();
     saveStore();
