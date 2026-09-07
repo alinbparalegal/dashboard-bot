@@ -594,8 +594,17 @@ function renderBundle(bundle) {
   buildPeriodTabs(summary.desde);
 }
 
+// "Todo" y el mes en curso incluyen el día de hoy, que se calcula en vivo contra GHL para
+// las 5 marcas (hasta ~70s en frío, cacheado 3 min) — sin este aviso, esa espera parece un
+// cuelgue en vez de un cálculo en curso.
+function periodoIncluyeHoy() {
+  return !state.hasta || state.hasta === toDateStr(new Date());
+}
+
 function renderPlaceholder() {
-  const msg = '<div class="loading">Cargando…</div>';
+  const msg = periodoIncluyeHoy()
+    ? '<div class="loading">Calculando datos de hoy en vivo, puede tardar hasta 1 minuto…</div>'
+    : '<div class="loading">Cargando…</div>';
   ['#brands', '#donut-citas', '#donut-canal', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas']
     .forEach(sel => { $(sel).innerHTML = msg; });
   $('#heatmap-grid').innerHTML = '';
@@ -636,7 +645,9 @@ async function updateNow() {
   if (cooldownRemaining() > 0) return;
   const btn = $('#refresh-btn');
   if (btn) { btn.disabled = true; btn.textContent = '↻ Actualizando…'; }
-  $('#brands').innerHTML = '<div class="loading">Cargando dashboard…</div>';
+  $('#brands').innerHTML = periodoIncluyeHoy()
+    ? '<div class="loading">Calculando datos de hoy en vivo, puede tardar hasta 1 minuto…</div>'
+    : '<div class="loading">Cargando dashboard…</div>';
   try {
     const bundle = await fetchBundle(true);
     store.periods[periodKey()] = bundle;
