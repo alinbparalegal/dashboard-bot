@@ -362,6 +362,16 @@ function normalizaCampana(nombre) {
   return nombre.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+// GHL no reconoce TikTok como sessionSource propio (cae en "Referral" o "Direct traffic"
+// genéricos) — hay que detectarlo a mano por utm_source=tiktok, medium=tiktok, o el referrer
+// de la webview interna de la app (tiktok.com), validado a mano contra las 5 marcas.
+function esTikTok(c) {
+  const utmSource = (c.utmSource || '').toLowerCase();
+  const medium = (c.medium || '').toLowerCase();
+  const referrer = (c.referrer || '').toLowerCase();
+  return utmSource === 'tiktok' || medium === 'tiktok' || referrer.includes('tiktok.com');
+}
+
 async function computeAttribution(desde, hasta) {
   const brands = getBrands();
   const sessionTotals = {};
@@ -370,7 +380,7 @@ async function computeAttribution(desde, hasta) {
   await Promise.all(brands.map(async brand => {
     const contactos = await ghl.listByAnyTag(brand, ESTADO_TAGS, desde, hasta);
     contactos.forEach(c => {
-      const src = c.sessionSource || 'Desconocido';
+      const src = esTikTok(c) ? 'TikTok' : (c.sessionSource || 'Desconocido');
       sessionTotals[src] = (sessionTotals[src] || 0) + 1;
 
       if (c.campaign) {

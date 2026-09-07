@@ -174,6 +174,9 @@ async function listByAnyTag(brand, tags, gte, lte) {
       tags: c.tags || [],
       sessionSource: c.attributionSource?.sessionSource || null,
       campaign: c.attributionSource?.campaign || null,
+      medium: c.attributionSource?.medium || null,
+      utmSource: c.attributionSource?.utmSource || null,
+      referrer: c.attributionSource?.referrer || null,
     })));
     if (contacts.length < 100) break;
     const last = contacts[contacts.length - 1];
