@@ -625,7 +625,15 @@ async function loadSummaryPiece(force) {
     markUpdated();
     return summary;
   } catch (e) {
-    if (periodKey() === key) $('#brands').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+    // Todo lo que pinta esta pieza (KPIs, roscos de citas, tarjetas, comparativa) se queda
+    // igual si no se avisa aquí también — antes solo se avisaba en "#brands" y el resto
+    // parecía simplemente vacío en vez de "está fallando".
+    if (periodKey() === key) {
+      const msg = `<div class="loading">Error: ${e.message}</div>`;
+      $('#brands').innerHTML = msg;
+      $('#donut-citas').innerHTML = msg;
+      $('#brand-compare').innerHTML = msg;
+    }
     throw e;
   }
 }
@@ -732,11 +740,10 @@ function renderPlaceholder() {
   const msg = periodoIncluyeHoy()
     ? '<div class="loading">Calculando datos de hoy en vivo, puede tardar hasta 1 minuto…</div>'
     : '<div class="loading">Cargando…</div>';
-  ['#brands', '#donut-citas', '#donut-canal', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas']
+  ['#brands', '#donut-citas', '#donut-canal', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas', '#brand-compare']
     .forEach(sel => { $(sel).innerHTML = msg; });
   $('#heatmap-grid').innerHTML = '';
   $('#trend-chart').innerHTML = '';
-  $('#brand-compare').innerHTML = '';
   $('#kpi-conversacion').textContent = '—';
   $('#kpi-cualificado').textContent = '—';
   $('#kpi-cita').textContent = '—';
