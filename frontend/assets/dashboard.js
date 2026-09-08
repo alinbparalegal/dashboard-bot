@@ -582,55 +582,143 @@ function periodKey() {
   return state.desde ? `${state.desde}_${state.hasta}` : 'todo';
 }
 
+// Las pestañas de periodo son navegación, no un dato más: no deben depender de que termine
+// ninguna consulta lenta (summary/channels/etc. pueden tardar cuando GHL va lento para "hoy").
+// /launch-date no toca Mongo ni GHL, así que las pestañas aparecen siempre, pase lo que pase
+// con el resto de la carga.
+async function loadLaunchDateAndBuildTabs() {
+  try {
+    const { launchDate } = await fetchJSON('/api/stats/launch-date');
+    buildPeriodTabs(launchDate);
+  } catch (e) { /* endpoint propio sin dependencias externas: un fallo aquí sería el servidor caído del todo */ }
+}
+
+function periodBundle(key) {
+  return store.periods[key] || {};
+}
+
+function markUpdated() {
+  $('#meta-actualizado').textContent = `Actualizado a las ${fmtHora(new Date().toISOString())}`;
+}
+
 // canales/timeline/atribución ya se componen sumando lo guardado día a día en Mongo (barato,
 // nada de GHL salvo "hoy"), así que cambiar de pestaña puede pedirlos sin miedo. force=true
 // (solo desde "Actualizar datos") además refresca el día de hoy en vez de servir su caché de
 // 3 min — de ahí el enfriamiento del botón, para no forzar esa parte en vivo sin necesidad.
-async function fetchBundle(force = false) {
-  const forceQuery = force ? { force: 'true' } : {};
-  const [summary, daily, channels, timeline, attribution] = await Promise.all([
-    fetchJSON(`/api/stats/summary${apiQuery()}`),
-    fetchJSON(`/api/stats/daily${apiQuery(state.desde ? {} : { days: '30' })}`),
-    fetchJSON(`/api/stats/channels${apiQuery(forceQuery)}`),
-    fetchJSON(`/api/stats/timeline${apiQuery(forceQuery)}`),
-    fetchJSON(`/api/stats/attribution${apiQuery(forceQuery)}`),
-  ]);
-  return { summary, daily, channels, timeline, attribution, fetchedAt: new Date().toISOString() };
-}
-
-// Carga (no forzada) el periodo actualmente seleccionado y actualiza su caché local. Se usa
-// al cambiar de pestaña: como ya no depende de GHL en vivo (salvo "hoy"), no hace falta
-// esperar a "Actualizar datos" para ver un periodo por primera vez.
-async function loadPeriod() {
+//
+// Cada pieza se pide y se pinta por separado (en vez de esperar a las 5 juntas): si GHL va
+// lento calculando "hoy", solo la pieza que lo necesita se queda cargando — las demás (todas
+// las que sean de un periodo cerrado, y hasta las de "hoy" que ya estén en Mongo) no tienen
+// por qué esperar a que esa se resuelva o falle.
+async function loadSummaryPiece(force) {
   const key = periodKey();
   try {
-    const bundle = await fetchBundle(false);
-    store.periods[key] = bundle;
+    const summary = await fetchJSON(`/api/stats/summary${apiQuery()}`);
+    if (periodKey() !== key) return summary;
+    renderKpis(summary.total);
+    renderCitasDonut(summary.marcas);
+    $('#brands').innerHTML = summary.marcas.map(renderBrandCard).join('');
+    renderBrandCompare(summary.comparativaMensual);
+    $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
+    store.periods[key] = { ...periodBundle(key), summary };
     saveStore();
-    if (periodKey() === key) renderBundle(bundle);
+    markUpdated();
+    return summary;
   } catch (e) {
     if (periodKey() === key) $('#brands').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+    throw e;
   }
 }
 
+async function loadDailyPiece() {
+  const key = periodKey();
+  try {
+    const daily = await fetchJSON(`/api/stats/daily${apiQuery(state.desde ? {} : { days: '30' })}`);
+    if (periodKey() !== key) return;
+    renderHeatmapAndTrend(daily);
+    store.periods[key] = { ...periodBundle(key), daily };
+    saveStore();
+  } catch (e) {
+    if (periodKey() === key) $('#trend-chart').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+  }
+}
+
+// Necesita el total de conversación del resumen para calcular "sin canal registrado", así
+// que espera a esa pieza (pero no a timeline/atribución, que van cada una por su lado).
+async function loadChannelsPiece(summaryPromise, force) {
+  const key = periodKey();
+  const forceQuery = force ? { force: 'true' } : {};
+  try {
+    const [channels, summary] = await Promise.all([fetchJSON(`/api/stats/channels${apiQuery(forceQuery)}`), summaryPromise]);
+    if (periodKey() !== key) return;
+    if (!summary) { $('#donut-canal').innerHTML = '<div class="loading">Sin datos (falló el resumen).</div>'; return; }
+    renderChannelsDonut(channels, summary.total.conversacion);
+    store.periods[key] = { ...periodBundle(key), channels };
+    saveStore();
+  } catch (e) {
+    if (periodKey() === key) $('#donut-canal').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+  }
+}
+
+async function loadTimelinePiece(force) {
+  const key = periodKey();
+  const forceQuery = force ? { force: 'true' } : {};
+  try {
+    const timeline = await fetchJSON(`/api/stats/timeline${apiQuery(forceQuery)}`);
+    if (periodKey() !== key) return;
+    renderTimeline(timeline.marcas, timeline.computedAt);
+    renderUltimasCitas(timeline.marcas);
+    store.periods[key] = { ...periodBundle(key), timeline };
+    saveStore();
+  } catch (e) {
+    if (periodKey() === key) { $('#timeline').innerHTML = `<div class="loading">Error: ${e.message}</div>`; $('#ultimas-citas').innerHTML = ''; }
+  }
+}
+
+async function loadAttributionPiece(force) {
+  const key = periodKey();
+  const forceQuery = force ? { force: 'true' } : {};
+  try {
+    const attribution = await fetchJSON(`/api/stats/attribution${apiQuery(forceQuery)}`);
+    if (periodKey() !== key) return;
+    renderAttribution(attribution);
+    store.periods[key] = { ...periodBundle(key), attribution };
+    saveStore();
+  } catch (e) {
+    if (periodKey() === key) { $('#donut-sessionsource').innerHTML = `<div class="loading">Error: ${e.message}</div>`; $('#tabla-campanas').innerHTML = ''; }
+  }
+}
+
+function loadAllPieces(force) {
+  const summaryPromise = loadSummaryPiece(force).catch(() => null);
+  loadDailyPiece();
+  loadChannelsPiece(summaryPromise, force);
+  loadTimelinePiece(force);
+  loadAttributionPiece(force);
+}
+
+// Carga (no forzada) el periodo actualmente seleccionado. Se usa al cambiar de pestaña: como
+// ya no depende de GHL en vivo (salvo "hoy"), no hace falta esperar a "Actualizar datos" para
+// ver un periodo por primera vez.
+function loadPeriod() {
+  loadAllPieces(false);
+}
+
+// Pinta un bundle ya guardado en caché (recarga de página, o cambio a una pestaña ya vista).
+// Tolera bundles parciales: si alguna pieza falló la última vez, sencillamente no la pinta.
 function renderBundle(bundle) {
-  const { summary, daily, channels, timeline, attribution, fetchedAt } = bundle;
-  // Las pestañas de periodo son navegación, no un panel de datos más — van primero para que
-  // un fallo al pintar cualquier panel de abajo nunca se lleve la navegación por delante
-  // (ya pasó: un cambio de forma en attribution.campanas tumbaba renderAttribution a mitad
-  // de esta función, y buildPeriodTabs, al ir al final, nunca llegaba a ejecutarse).
-  buildPeriodTabs(summary.desde);
-  renderKpis(summary.total);
-  renderCitasDonut(summary.marcas);
-  renderChannelsDonut(channels, summary.total.conversacion);
-  $('#brands').innerHTML = summary.marcas.map(renderBrandCard).join('');
-  renderBrandCompare(summary.comparativaMensual);
-  $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
-  renderHeatmapAndTrend(daily);
-  renderTimeline(timeline.marcas, timeline.computedAt);
-  renderUltimasCitas(timeline.marcas);
-  renderAttribution(attribution);
-  $('#meta-actualizado').textContent = fetchedAt ? `Actualizado a las ${fmtHora(fetchedAt)}` : '';
+  const { summary, daily, channels, timeline, attribution } = bundle;
+  if (summary) {
+    renderKpis(summary.total);
+    renderCitasDonut(summary.marcas);
+    $('#brands').innerHTML = summary.marcas.map(renderBrandCard).join('');
+    renderBrandCompare(summary.comparativaMensual);
+    $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
+  }
+  if (daily) renderHeatmapAndTrend(daily);
+  if (channels && summary) renderChannelsDonut(channels, summary.total.conversacion);
+  if (timeline) { renderTimeline(timeline.marcas, timeline.computedAt); renderUltimasCitas(timeline.marcas); }
+  if (attribution) renderAttribution(attribution);
 }
 
 // "Todo" y el mes en curso incluyen el día de hoy, que se calcula en vivo contra GHL para
@@ -680,34 +768,32 @@ function startCooldownUI() {
   if (!cooldownTimer) cooldownTimer = setInterval(tickCooldown, 1000);
 }
 
-async function updateNow() {
+function updateNow() {
   if (cooldownRemaining() > 0) return;
   const btn = $('#refresh-btn');
   if (btn) { btn.disabled = true; btn.textContent = '↻ Actualizando…'; }
-  $('#brands').innerHTML = periodoIncluyeHoy()
-    ? '<div class="loading">Calculando datos de hoy en vivo, puede tardar hasta 1 minuto…</div>'
-    : '<div class="loading">Cargando dashboard…</div>';
-  try {
-    const bundle = await fetchBundle(true);
-    store.periods[periodKey()] = bundle;
-    store.lastUpdateClickAt = Date.now();
-    saveStore();
-    renderBundle(bundle);
-  } catch (e) {
-    $('#brands').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
-  } finally {
-    startCooldownUI();
+  if (periodoIncluyeHoy()) {
+    $('#brands').innerHTML = '<div class="loading">Calculando datos de hoy en vivo, puede tardar hasta 1 minuto…</div>';
   }
+  // El enfriamiento protege a GHL de que se le pida recalcular "hoy" a lo loco — cuenta el
+  // intento en sí, no si GHL respondió a tiempo (si contara solo el éxito, un GHL lento
+  // invitaría a machacar el botón justo cuando menos conviene).
+  store.lastUpdateClickAt = Date.now();
+  saveStore();
+  startCooldownUI();
+  loadAllPieces(true);
 }
 
 function init() {
+  loadLaunchDateAndBuildTabs();
   const cached = store.periods['todo'];
-  if (cached) {
+  if (cached && cached.summary) {
     renderBundle(cached);
+    startCooldownUI();
   } else {
+    renderPlaceholder();
     updateNow();
   }
-  startCooldownUI();
 }
 
 $('#refresh-btn')?.addEventListener('click', updateNow);

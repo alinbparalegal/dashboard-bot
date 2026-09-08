@@ -1,5 +1,11 @@
 const statsService = require('../services/statsService');
 
+// Sin Mongo ni GHL: las pestañas de periodo (Todo/mes) necesitan saber desde cuándo hay
+// datos, pero no deberían depender de que termine ninguna consulta lenta para aparecer.
+function getLaunchDate(req, res) {
+  res.status(200).json({ launchDate: process.env.BOT_LAUNCH_DATE });
+}
+
 async function getDailyTotals(req, res) {
   try {
     const days = parseInt(req.query.days, 10) || 30;
@@ -77,4 +83,4 @@ async function getAttribution(req, res) {
   }
 }
 
-module.exports = { getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution };
+module.exports = { getLaunchDate, getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution };
