@@ -76,8 +76,14 @@ async function computeAtribucionDiaria(brand, fecha) {
     const src = esTikTok(c) ? 'TikTok' : (c.sessionSource || 'Desconocido');
     session_source[src] = (session_source[src] || 0) + 1;
     if (c.campaign) {
-      const key = normalizaCampana(c.campaign);
-      if (!campanasMap.has(key)) campanasMap.set(key, { key, nombre: c.campaign.trim(), leads: 0, cualificados: 0, citas: 0 });
+      // "Paid Social" es el único sessionSource que GHL solo asigna cuando detecta un clic
+      // de anuncio real (campaignId/adId de Facebook) — un UTM de campaña puesto a mano en
+      // un enlace orgánico (bio, búsqueda) nunca lo produce, así que separa pago de orgánico
+      // mejor que fiarse del texto de utm_medium (que en los anuncios trae el nombre del
+      // conjunto de anuncios, no una palabra clave).
+      const pago = c.sessionSource === 'Paid Social';
+      const key = `${normalizaCampana(c.campaign)}__${pago}`;
+      if (!campanasMap.has(key)) campanasMap.set(key, { key, nombre: c.campaign.trim(), pago, leads: 0, cualificados: 0, citas: 0 });
       const entry = campanasMap.get(key);
       entry.leads++;
       if (c.tags.some(t => ['lead_potencial', 'pago_pendiente', 'consulta_agendada', 'cliente_postventa'].includes(t))) entry.cualificados++;
@@ -365,7 +371,61 @@ async function getSummary(desde, hasta) {
     return acc;
   }, { conversacion: 0, etapa1_cualificado: 0, etapa2_cita: 0, etapa3_venta: 0, ingreso_min: 0, ingreso_max: 0 });
 
-  return { desde, hasta, marcas: perBrand, total };
+  // Solo tiene sentido comparar "este mes" contra "el mes pasado hasta el mismo día" cuando
+  // se está viendo el presente (Todo o el mes en curso) — un mes cerrado del pasado no tiene
+  // un "hoy" con el que compararse. Ligado al mismo criterio que el aviso de "hoy en vivo".
+  const comparativaMensual = hasta === todayStr() ? await computeComparativaMensual() : null;
+
+  return { desde, hasta, marcas: perBrand, total, comparativaMensual };
+}
+
+// Compara "este mes hasta hoy" contra "el mes anterior hasta el mismo día del mes", por
+// marca — así una barra de un mes a medias nunca se compara injustamente contra un mes
+// cerrado entero. Independiente del periodo/pestaña activa: siempre mira al calendario real.
+async function computeComparativaMensual() {
+  const brands = getBrands();
+  const hoy = new Date();
+  const diaDelMes = hoy.getUTCDate();
+
+  const inicioMesActual = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 1));
+  const inicioMesAnterior = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - 1, 1));
+  const ultimoDiaMesAnterior = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 0)).getUTCDate();
+  const finMesAnterior = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - 1, Math.min(diaDelMes, ultimoDiaMesAnterior)));
+  const ayer = new Date(hoy);
+  ayer.setUTCDate(ayer.getUTCDate() - 1);
+
+  const desdeActual = toDateStr(inicioMesActual);
+  const desdeAnterior = toDateStr(inicioMesAnterior);
+  const hastaAnterior = toDateStr(finMesAnterior);
+  const hastaActualCerrado = toDateStr(ayer);
+
+  const sumaConversacionCitas = docs => docs.reduce((acc, d) => ({
+    conversacion: acc.conversacion + d.conversacion,
+    citas: acc.citas + d.consulta_agendada,
+  }), { conversacion: 0, citas: 0 });
+
+  const marcas = await Promise.all(brands.map(async brand => {
+    const [actualDocs, anteriorDocs, live] = await Promise.all([
+      inicioMesActual <= ayer
+        ? DailyStat.find({ marca: brand.code, fecha: { $gte: desdeActual, $lte: hastaActualCerrado } }).lean()
+        : Promise.resolve([]),
+      DailyStat.find({ marca: brand.code, fecha: { $gte: desdeAnterior, $lte: hastaAnterior } }).lean(),
+      getLiveTodayStats(brand),
+    ]);
+    const actualCerrado = sumaConversacionCitas(actualDocs);
+    const anterior = sumaConversacionCitas(anteriorDocs);
+    const actual = {
+      conversacion: actualCerrado.conversacion + live.conversacion,
+      citas: actualCerrado.citas + live.consulta_agendada,
+    };
+    return { marca: brand.code, nombre: brand.name, actual, anterior };
+  }));
+
+  return { desdeActual, hastaActual: todayStr(), desdeAnterior, hastaAnterior, marcas };
+}
+
+function toDateStr(d) {
+  return d.toISOString().slice(0, 10);
 }
 
 function mapaAObjeto(m) {
@@ -432,7 +492,8 @@ function getCitasTimeline(desde, hasta, force = false) {
 async function computeAttribution(desde, hasta, force = false) {
   const brands = getBrands();
   const sessionTotals = {};
-  const campanas = new Map(); // key normalizado -> { nombre, leads, cualificados, citas }
+  const campanasPago = new Map(); // nombre normalizado -> { nombre, leads, cualificados, citas }
+  const campanasOrganico = new Map();
 
   await Promise.all(brands.map(async brand => {
     const docs = await DailyStat.find({ marca: brand.code, fecha: { $gte: desde, $lte: hasta } }).lean();
@@ -445,9 +506,12 @@ async function computeAttribution(desde, hasta, force = false) {
     dias.forEach(({ session_source, campanas: campanasDia }) => {
       mergeMaps(sessionTotals, session_source);
       campanasDia.forEach(dc => {
-        const key = dc.key || normalizaCampana(dc.nombre);
-        if (!campanas.has(key)) campanas.set(key, { nombre: dc.nombre, leads: 0, cualificados: 0, citas: 0 });
-        const entry = campanas.get(key);
+        // dc.pago no existe en documentos guardados antes de la separación pago/orgánico;
+        // se asume orgánico por defecto (opción más conservadora, no infla el rendimiento pagado).
+        const grupo = dc.pago ? campanasPago : campanasOrganico;
+        const key = normalizaCampana(dc.nombre);
+        if (!grupo.has(key)) grupo.set(key, { nombre: dc.nombre, leads: 0, cualificados: 0, citas: 0 });
+        const entry = grupo.get(key);
         entry.leads += dc.leads || 0;
         entry.cualificados += dc.cualificados || 0;
         entry.citas += dc.citas || 0;
@@ -455,8 +519,14 @@ async function computeAttribution(desde, hasta, force = false) {
     });
   }));
 
-  const campanasArr = [...campanas.values()].sort((a, b) => b.leads - a.leads);
-  return { desde, hasta, sessionSource: sessionTotals, campanas: campanasArr, computedAt: new Date().toISOString() };
+  const porLeads = (a, b) => b.leads - a.leads;
+  return {
+    desde, hasta,
+    sessionSource: sessionTotals,
+    campanasPago: [...campanasPago.values()].sort(porLeads),
+    campanasOrganico: [...campanasOrganico.values()].sort(porLeads),
+    computedAt: new Date().toISOString(),
+  };
 }
 
 function getAttribution(desde, hasta, force = false) {
@@ -465,6 +535,7 @@ function getAttribution(desde, hasta, force = false) {
 
 module.exports = {
   computeDailyStatsForBrand,
+  computeAtribucionDiaria,
   upsertDailyStats,
   upsertDailyStatsAllBrands,
   getDailyTotals,

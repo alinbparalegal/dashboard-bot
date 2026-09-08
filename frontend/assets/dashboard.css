@@ -105,20 +105,29 @@ h1.title { font-size: 28px; font-weight: 600; }
 /* Comparativa entre marcas */
 .compare-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 32px; box-shadow: var(--shadow); }
 .compare-card h2 { font-size: 16px; margin-bottom: 14px; }
-.compare-row { display: grid; grid-template-columns: 90px 1fr 70px 1fr 60px; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
-.compare-row:last-child { border-bottom: none; }
-.compare-row .cmp-name { font-weight: 600; }
-.compare-row .cmp-code { font-family: ui-monospace, monospace; font-size: 10.5px; color: var(--ink-faint); margin-left: 4px; }
-.compare-row .cmp-value { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink-soft); }
-.compare-track { height: 8px; background: var(--surface-alt); border-radius: 3px; overflow: hidden; }
-.compare-fill { height: 100%; border-radius: 3px; min-width: 2px; }
-.compare-fill.conv { background: var(--accent); }
-.compare-fill.rate { background: var(--warn); }
-.compare-head { display: grid; grid-template-columns: 90px 1fr 70px 1fr 60px; gap: 10px; font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.03em; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
-@media (max-width: 640px) {
-  .compare-row, .compare-head { grid-template-columns: 60px 1fr 50px; }
-  .compare-row .cmp-rate-track, .compare-row .cmp-rate-value, .compare-head .cmp-rate-label { display: none; }
-}
+.compare-legend { display: flex; gap: 16px; font-size: 11px; color: var(--ink-faint); margin-bottom: 12px; flex-wrap: wrap; }
+.compare-legend .li { display: flex; align-items: center; gap: 5px; }
+.compare-legend .tick { width: 2px; height: 10px; background: var(--ink-faint); display: inline-block; }
+.compare-legend .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.compare-legend .sw.up { background: var(--good); }
+.compare-legend .sw.down { background: var(--warn); }
+.compare-legend .sw.citas { background: var(--ink); }
+
+.bmrow { display: grid; grid-template-columns: 72px 1fr 60px; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.bmrow:last-child { border-bottom: none; }
+.bmrow .cmp-name-wrap { display: flex; flex-direction: column; gap: 1px; }
+.bmrow .cmp-name { font-weight: 600; }
+.bmrow .delta { font-family: ui-monospace, monospace; font-size: 10.5px; font-weight: 600; }
+.bmrow .delta.up { color: var(--good); }
+.bmrow .delta.down { color: var(--warn); }
+.bmrow .cmp-value { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink-soft); }
+.bullet { position: relative; height: 22px; }
+.bullet .prev-track { position: absolute; inset: 0; background: var(--surface-alt); border-radius: 4px; }
+.bullet .prev-mark { position: absolute; top: -2px; width: 2px; height: 26px; background: var(--ink-faint); }
+.bullet .now { position: absolute; left: 0; top: 5px; height: 12px; border-radius: 3px; min-width: 2px; }
+.bullet .now.up { background: var(--good); }
+.bullet .now.down { background: var(--warn); }
+.bullet .citas { position: absolute; left: 0; top: 8px; height: 6px; background: var(--ink); border-radius: 2px; min-width: 2px; }
 .heatmap-grid { display: flex; gap: 4px; flex-wrap: wrap; }
 .heatmap-cell {
   width: 22px; height: 22px; border-radius: 4px; background: var(--surface-alt);
@@ -218,6 +227,8 @@ h1.title { font-size: 28px; font-weight: 600; }
 .campana-row .cp-tasa { font-family: ui-monospace, monospace; text-align: right; font-weight: 600; }
 .campana-row .cp-tasa.cero { color: var(--warn); }
 @media (max-width: 640px) { .campana-row, .campana-head { grid-template-columns: 1fr 45px 45px 45px; } .campana-head span:nth-child(4), .campana-row span:nth-child(4) { display: none; } }
+.cp-subtitulo { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-faint); font-weight: 600; margin: 14px 0 4px; }
+.cp-subtitulo:first-child { margin-top: 0; }
 
 footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--ink-faint); }
 .loading { color: var(--ink-faint); font-style: italic; padding: 20px 0; }

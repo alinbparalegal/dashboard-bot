@@ -22,9 +22,13 @@ const dailyStatSchema = new mongoose.Schema({
   // GHL salvo el día de hoy en vivo.
   canales: { type: Map, of: Number, default: {} },
   session_source: { type: Map, of: Number, default: {} },
+  // pago = true si el lead viene de sessionSource "Paid Social" (anuncio real, con
+  // campaignId/adId de Facebook); false si el UTM de campaña es de tráfico orgánico
+  // (bio de Instagram, búsqueda) etiquetado a mano — ver esTikTok/computeAtribucionDiaria.
   campanas: [{
     key: String,
     nombre: String,
+    pago: { type: Boolean, default: false },
     leads: { type: Number, default: 0 },
     cualificados: { type: Number, default: 0 },
     citas: { type: Number, default: 0 },

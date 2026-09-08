@@ -168,25 +168,49 @@ function renderBrandCard(b) {
   </article>`;
 }
 
-function renderBrandCompare(marcas) {
-  const maxConv = Math.max(...marcas.map(m => m.conversacion), 1);
-  const maxRate = Math.max(...marcas.map(m => m.conversacion ? m.etapa2_cita / m.conversacion * 100 : 0), 1);
-  const rows = marcas.map(m => {
-    const rate = m.conversacion ? (m.etapa2_cita / m.conversacion * 100) : 0;
+// Compara "este mes hasta hoy" contra "el mes anterior hasta el mismo día" por marca, con
+// un bullet chart: la raya vertical marca el punto de referencia del mes anterior, la barra
+// de color es el mes en curso (verde si ya lo supera, ámbar si va por detrás), y dentro de
+// esa barra, un segmento negro marca las citas conseguidas. Solo tiene datos en "Todo" y el
+// mes en curso — un mes cerrado del pasado no tiene un "hoy" con el que compararse.
+function renderBrandCompare(comparativaMensual) {
+  if (!comparativaMensual) {
+    $('#brand-compare').innerHTML = '<p class="bd-empty">La comparativa mes a mes solo está disponible en "Todo" y el mes en curso.</p>';
+    return;
+  }
+  const rows = comparativaMensual.marcas.map(m => {
+    const prev = m.anterior.conversacion;
+    const now = m.actual.conversacion;
+    const citas = m.actual.citas;
+    const scale = Math.max(prev, now, 1) * 1.15;
+    const prevPct = (prev / scale * 100).toFixed(1);
+    const nowPct = (now / scale * 100).toFixed(1);
+    const citasPct = (citas / scale * 100).toFixed(1);
+    const supera = now >= prev;
+    const delta = prev > 0 ? ((now - prev) / prev * 100) : (now > 0 ? 100 : 0);
+    const tasa = now ? (citas / now * 100) : 0;
     return `
-    <div class="compare-row">
-      <span><span class="cmp-name">${m.marca}</span></span>
-      <div class="compare-track"><div class="compare-fill conv" style="width:${(m.conversacion / maxConv * 100).toFixed(1)}%"></div></div>
-      <span class="cmp-value">${fmt(m.conversacion)}</span>
-      <div class="compare-track cmp-rate-track"><div class="compare-fill rate" style="width:${(rate / maxRate * 100).toFixed(1)}%"></div></div>
-      <span class="cmp-value cmp-rate-value">${pct(rate)} %</span>
+    <div class="bmrow">
+      <div class="cmp-name-wrap">
+        <span class="cmp-name">${m.marca}</span>
+        <span class="delta ${supera ? 'up' : 'down'}">${supera ? '▲' : '▼'} ${pct(Math.abs(delta))}%</span>
+      </div>
+      <div class="bullet">
+        <div class="prev-track"></div>
+        <div class="prev-mark" style="left:${prevPct}%"></div>
+        <div class="now ${supera ? 'up' : 'down'}" style="width:${nowPct}%"></div>
+        <div class="citas" style="width:${citasPct}%"></div>
+      </div>
+      <span class="cmp-value">${pct(tasa)} %</span>
     </div>`;
   }).join('');
 
   $('#brand-compare').innerHTML = `
-    <div class="compare-head">
-      <span>Marca</span><span>Conversación</span><span></span>
-      <span class="cmp-rate-label">Tasa → cita</span><span></span>
+    <div class="compare-legend">
+      <span class="li"><i class="tick"></i>mismo día, mes anterior</span>
+      <span class="li"><i class="sw up"></i>mes en curso, por delante</span>
+      <span class="li"><i class="sw down"></i>por detrás</span>
+      <span class="li"><i class="sw citas"></i>citas</span>
     </div>
     ${rows}`;
 }
@@ -487,11 +511,8 @@ function renderUltimasCitas(marcas) {
     </div>`).join('');
 }
 
-function renderCampanasTable(campanas) {
-  if (!campanas.length) {
-    $('#tabla-campanas').innerHTML = '<p class="bd-empty">Sin campañas con UTM en este periodo.</p>';
-    return;
-  }
+function renderCampanasGrupo(titulo, campanas) {
+  if (!campanas.length) return `<h4 class="cp-subtitulo">${titulo}</h4><p class="bd-empty">Sin campañas en este periodo.</p>`;
   const rows = campanas.slice(0, 15).map(c => {
     const tasa = c.leads ? (c.citas / c.leads * 100) : 0;
     return `
@@ -503,9 +524,20 @@ function renderCampanasTable(campanas) {
       <span class="cp-tasa${c.citas === 0 ? ' cero' : ''}">${pct(tasa)} %</span>
     </div>`;
   }).join('');
-  $('#tabla-campanas').innerHTML = `
+  return `
+    <h4 class="cp-subtitulo">${titulo}</h4>
     <div class="campana-head"><span>Campaña</span><span>Leads</span><span>Cualif.</span><span>Citas</span><span>Tasa</span></div>
     ${rows}`;
+}
+
+function renderCampanasTable(campanasPago, campanasOrganico) {
+  if (!campanasPago.length && !campanasOrganico.length) {
+    $('#tabla-campanas').innerHTML = '<p class="bd-empty">Sin campañas con UTM en este periodo.</p>';
+    return;
+  }
+  $('#tabla-campanas').innerHTML =
+    renderCampanasGrupo('De pago (Paid Social)', campanasPago) +
+    renderCampanasGrupo('Orgánico con UTM', campanasOrganico);
 }
 
 function renderAttribution(data) {
@@ -520,7 +552,7 @@ function renderAttribution(data) {
   if (restTotal > 0) entries.push({ label: 'Otros', value: restTotal, color: c.faint });
   renderDonut('#donut-sessionsource', entries, 'leads');
 
-  renderCampanasTable(data.campanas);
+  renderCampanasTable(data.campanasPago, data.campanasOrganico);
 }
 
 // ---------------------------------------------------------------------------------
@@ -584,7 +616,7 @@ function renderBundle(bundle) {
   renderCitasDonut(summary.marcas);
   renderChannelsDonut(channels, summary.total.conversacion);
   $('#brands').innerHTML = summary.marcas.map(renderBrandCard).join('');
-  renderBrandCompare(summary.marcas);
+  renderBrandCompare(summary.comparativaMensual);
   $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
   renderHeatmapAndTrend(daily);
   renderTimeline(timeline.marcas, timeline.computedAt);
