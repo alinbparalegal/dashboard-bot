@@ -530,7 +530,7 @@ function renderCampanasGrupo(titulo, campanas) {
     ${rows}`;
 }
 
-function renderCampanasTable(campanasPago, campanasOrganico) {
+function renderCampanasTable(campanasPago = [], campanasOrganico = []) {
   if (!campanasPago.length && !campanasOrganico.length) {
     $('#tabla-campanas').innerHTML = '<p class="bd-empty">Sin campañas con UTM en este periodo.</p>';
     return;
@@ -560,7 +560,10 @@ function renderAttribution(data) {
 // cambiar de pestaña o recargar la página no pida nada nuevo a GHL — solo el botón
 // "Actualizar datos" trae datos frescos, con un enfriamiento de 15 minutos.
 // ---------------------------------------------------------------------------------
-const STORE_KEY = 'dashboardStore_v1';
+// v2: la forma de attribution.campanas cambió (campanasPago/campanasOrganico en vez de
+// campanas) — una caché v1 en el navegador de alguien rompía renderBundle a mitad camino
+// (justo antes de construir las pestañas de periodo, que por eso desaparecían).
+const STORE_KEY = 'dashboardStore_v2';
 const COOLDOWN_MS = 15 * 60 * 1000;
 
 function loadStore() {
@@ -612,6 +615,11 @@ async function loadPeriod() {
 
 function renderBundle(bundle) {
   const { summary, daily, channels, timeline, attribution, fetchedAt } = bundle;
+  // Las pestañas de periodo son navegación, no un panel de datos más — van primero para que
+  // un fallo al pintar cualquier panel de abajo nunca se lleve la navegación por delante
+  // (ya pasó: un cambio de forma en attribution.campanas tumbaba renderAttribution a mitad
+  // de esta función, y buildPeriodTabs, al ir al final, nunca llegaba a ejecutarse).
+  buildPeriodTabs(summary.desde);
   renderKpis(summary.total);
   renderCitasDonut(summary.marcas);
   renderChannelsDonut(channels, summary.total.conversacion);
@@ -623,7 +631,6 @@ function renderBundle(bundle) {
   renderUltimasCitas(timeline.marcas);
   renderAttribution(attribution);
   $('#meta-actualizado').textContent = fetchedAt ? `Actualizado a las ${fmtHora(fetchedAt)}` : '';
-  buildPeriodTabs(summary.desde);
 }
 
 // "Todo" y el mes en curso incluyen el día de hoy, que se calcula en vivo contra GHL para
