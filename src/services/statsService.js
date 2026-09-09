@@ -298,7 +298,7 @@ function mergeMaps(target, source) {
 
 // Agrega el funnel completo (como el Artifact) sumando los DailyStat guardados en un rango.
 // Si el rango incluye "hoy", ese día se computa en vivo y se suma también.
-async function getSummary(desde, hasta) {
+async function getSummary(desde, hasta, mesReferencia) {
   const brands = getBrands();
   const perBrand = [];
 
@@ -371,33 +371,42 @@ async function getSummary(desde, hasta) {
     return acc;
   }, { conversacion: 0, etapa1_cualificado: 0, etapa2_cita: 0, etapa3_venta: 0, ingreso_min: 0, ingreso_max: 0 });
 
-  // Solo tiene sentido comparar "este mes" contra "el mes pasado hasta el mismo día" cuando
-  // se está viendo el presente (Todo o el mes en curso) — un mes cerrado del pasado no tiene
-  // un "hoy" con el que compararse. Ligado al mismo criterio que el aviso de "hoy en vivo".
-  const comparativaMensual = hasta === todayStr() ? await computeComparativaMensual() : null;
+  // mesReferencia: el mes de la pestaña activa (o el mes en curso si es "Todo", que no tiene
+  // un mes propio). Antes solo se calculaba para Todo/mes en curso; ahora cualquier mes
+  // cerrado también obtiene su comparativa, mes completo contra mes completo, sin tocar GHL.
+  const comparativaMensual = await computeComparativaMensual(mesReferencia);
 
   return { desde, hasta, marcas: perBrand, total, comparativaMensual };
 }
 
-// Compara "este mes hasta hoy" contra "el mes anterior hasta el mismo día del mes", por
-// marca — así una barra de un mes a medias nunca se compara injustamente contra un mes
-// cerrado entero. Independiente del periodo/pestaña activa: siempre mira al calendario real.
-async function computeComparativaMensual() {
+// Compara un mes contra el mes anterior, por marca. Si mesReferencia es el mes en curso,
+// compara "hasta hoy" contra "el mes anterior hasta el mismo día" (para no penalizar un mes
+// a medias); si es un mes ya cerrado, compara el mes completo contra el mes anterior
+// completo — ambos cerrados, así que no hace falta ninguna llamada a GHL en absoluto.
+async function computeComparativaMensual(mesReferencia) {
   const brands = getBrands();
-  const hoy = new Date();
-  const diaDelMes = hoy.getUTCDate();
+  const [anioRef, mesRef] = mesReferencia.split('-').map(Number); // mesRef: 1-12
+  const esMesActual = mesReferencia === todayStr().slice(0, 7);
 
-  const inicioMesActual = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 1));
-  const inicioMesAnterior = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - 1, 1));
-  const ultimoDiaMesAnterior = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), 0)).getUTCDate();
-  const finMesAnterior = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth() - 1, Math.min(diaDelMes, ultimoDiaMesAnterior)));
-  const ayer = new Date(hoy);
+  const inicioMes = new Date(Date.UTC(anioRef, mesRef - 1, 1));
+  const inicioMesAnterior = new Date(Date.UTC(anioRef, mesRef - 2, 1));
+  const finMesAnteriorCompleto = new Date(Date.UTC(anioRef, mesRef - 1, 0));
+
+  let hastaMes, hastaMesAnterior;
+  if (esMesActual) {
+    const hoy = new Date();
+    hastaMes = toDateStr(hoy);
+    hastaMesAnterior = toDateStr(new Date(Date.UTC(anioRef, mesRef - 2, Math.min(hoy.getUTCDate(), finMesAnteriorCompleto.getUTCDate()))));
+  } else {
+    hastaMes = toDateStr(new Date(Date.UTC(anioRef, mesRef, 0)));
+    hastaMesAnterior = toDateStr(finMesAnteriorCompleto);
+  }
+
+  const desdeMes = toDateStr(inicioMes);
+  const desdeMesAnterior = toDateStr(inicioMesAnterior);
+  const ayer = new Date();
   ayer.setUTCDate(ayer.getUTCDate() - 1);
-
-  const desdeActual = toDateStr(inicioMesActual);
-  const desdeAnterior = toDateStr(inicioMesAnterior);
-  const hastaAnterior = toDateStr(finMesAnterior);
-  const hastaActualCerrado = toDateStr(ayer);
+  const hastaMesCerrado = esMesActual ? toDateStr(ayer) : hastaMes;
 
   const sumaConversacionCitas = docs => docs.reduce((acc, d) => ({
     conversacion: acc.conversacion + d.conversacion,
@@ -406,22 +415,21 @@ async function computeComparativaMensual() {
 
   const marcas = await Promise.all(brands.map(async brand => {
     const [actualDocs, anteriorDocs, live] = await Promise.all([
-      inicioMesActual <= ayer
-        ? DailyStat.find({ marca: brand.code, fecha: { $gte: desdeActual, $lte: hastaActualCerrado } }).lean()
+      inicioMes <= ayer
+        ? DailyStat.find({ marca: brand.code, fecha: { $gte: desdeMes, $lte: hastaMesCerrado } }).lean()
         : Promise.resolve([]),
-      DailyStat.find({ marca: brand.code, fecha: { $gte: desdeAnterior, $lte: hastaAnterior } }).lean(),
-      getLiveTodayStats(brand),
+      DailyStat.find({ marca: brand.code, fecha: { $gte: desdeMesAnterior, $lte: hastaMesAnterior } }).lean(),
+      esMesActual ? getLiveTodayStats(brand) : Promise.resolve(null),
     ]);
     const actualCerrado = sumaConversacionCitas(actualDocs);
     const anterior = sumaConversacionCitas(anteriorDocs);
-    const actual = {
-      conversacion: actualCerrado.conversacion + live.conversacion,
-      citas: actualCerrado.citas + live.consulta_agendada,
-    };
+    const actual = esMesActual
+      ? { conversacion: actualCerrado.conversacion + live.conversacion, citas: actualCerrado.citas + live.consulta_agendada }
+      : actualCerrado;
     return { marca: brand.code, nombre: brand.name, actual, anterior };
   }));
 
-  return { desdeActual, hastaActual: todayStr(), desdeAnterior, hastaAnterior, marcas };
+  return { esMesActual, desdeActual: desdeMes, hastaActual: hastaMes, desdeAnterior: desdeMesAnterior, hastaAnterior: hastaMesAnterior, marcas };
 }
 
 function toDateStr(d) {

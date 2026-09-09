@@ -175,9 +175,10 @@ function renderBrandCard(b) {
 // mes en curso — un mes cerrado del pasado no tiene un "hoy" con el que compararse.
 function renderBrandCompare(comparativaMensual) {
   if (!comparativaMensual) {
-    $('#brand-compare').innerHTML = '<p class="bd-empty">La comparativa mes a mes solo está disponible en "Todo" y el mes en curso.</p>';
+    $('#brand-compare').innerHTML = '<p class="bd-empty">Sin datos de comparativa para este periodo.</p>';
     return;
   }
+  const { esMesActual } = comparativaMensual;
   const rows = comparativaMensual.marcas.map(m => {
     const prev = m.anterior.conversacion;
     const now = m.actual.conversacion;
@@ -207,8 +208,8 @@ function renderBrandCompare(comparativaMensual) {
 
   $('#brand-compare').innerHTML = `
     <div class="compare-legend">
-      <span class="li"><i class="tick"></i>mismo día, mes anterior</span>
-      <span class="li"><i class="sw up"></i>mes en curso, por delante</span>
+      <span class="li"><i class="tick"></i>${esMesActual ? 'mismo día, mes anterior' : 'mes anterior (completo)'}</span>
+      <span class="li"><i class="sw up"></i>${esMesActual ? 'mes en curso, por delante' : 'supera al mes anterior'}</span>
       <span class="li"><i class="sw down"></i>por detrás</span>
       <span class="li"><i class="sw citas"></i>citas</span>
     </div>

@@ -36,7 +36,10 @@ async function getSummary(req, res) {
   try {
     const hasta = req.query.hasta || statsService.todayStr();
     const desde = req.query.desde || process.env.BOT_LAUNCH_DATE || hasta;
-    const data = await statsService.getSummary(desde, hasta);
+    // "Todo" (sin desde/hasta explícitos en la query) no tiene un mes propio con el que
+    // comparar — se usa el mes en curso como referencia. Una pestaña de mes sí lo tiene.
+    const mesReferencia = req.query.desde ? hasta.slice(0, 7) : statsService.todayStr().slice(0, 7);
+    const data = await statsService.getSummary(desde, hasta, mesReferencia);
     res.status(200).json(data);
   } catch (error) {
     console.error('Error en getSummary:', error);
