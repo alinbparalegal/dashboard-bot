@@ -59,21 +59,37 @@ function esTikTok(c) {
   return utmSource === 'tiktok' || medium === 'tiktok' || referrer.includes('tiktok.com');
 }
 
+// Canal real del último mensaje (GHL nativo, vía conversations/search) — sustituye a los
+// tags canal_whatsapp/instagram/facebook, que una plantilla de automatización compartida
+// dejó de aplicar el 2026-09-01 en las 5 marcas a la vez (se quedaron en un "lead-organico"
+// genérico que no distingue canal). No depende de que ninguna automatización recuerde
+// etiquetar nada — es un hecho que GHL ya registra por su cuenta.
+const CANAL_DE_TIPO = {
+  TYPE_WHATSAPP: 'canal_whatsapp',
+  TYPE_INSTAGRAM: 'canal_instagram',
+  TYPE_FACEBOOK: 'canal_facebook',
+};
+
 // Canal de entrada, procedencia real (sessionSource/TikTok) y campañas de UN día, para UNA
 // marca. Acotado a un solo día, el listado de contactos con algún tag de estado (para
 // sessionSource/campaña) casi nunca pasa de una página, así que sale barato guardarlo día
 // a día en vez de recalcularlo cada vez que alguien pide un rango.
 async function computeAtribucionDiaria(brand, fecha) {
-  const canales = {};
-  for (const tag of CANAL_TAGS) {
-    canales[tag] = await ghl.countTag(brand, tag, fecha, fecha);
-  }
-
   const contactosDia = await ghl.listByAnyTag(brand, ESTADO_TAGS, fecha, fecha);
+  const lastMessageTypes = await Promise.all(contactosDia.map(c => ghl.getLastMessageType(brand, c.id)));
+
+  const canales = { canal_whatsapp: 0, canal_instagram: 0, canal_facebook: 0 };
   const session_source = {};
   const campanasMap = new Map();
-  contactosDia.forEach(c => {
-    const src = esTikTok(c) ? 'TikTok' : (c.sessionSource || 'Desconocido');
+  contactosDia.forEach((c, i) => {
+    const lastMessageType = lastMessageTypes[i];
+    const canalTag = CANAL_DE_TIPO[lastMessageType];
+    if (canalTag) canales[canalTag]++;
+
+    // TikTok: GHL ya lo distingue como canal propio (TYPE_TIKTOK) cuando hay conversación —
+    // más directo que la heurística de UTM/referrer, que se mantiene como respaldo para
+    // leads que llegan con ese origen pero sin llegar a escribir.
+    const src = (lastMessageType === 'TYPE_TIKTOK' || esTikTok(c)) ? 'TikTok' : (c.sessionSource || 'Desconocido');
     session_source[src] = (session_source[src] || 0) + 1;
     if (c.campaign) {
       // "Paid Social" es el único sessionSource que GHL solo asigna cuando detecta un clic

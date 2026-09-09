@@ -134,6 +134,25 @@ async function getContact(brand, contactId) {
   });
 }
 
+// Canal real del último mensaje de un contacto (WhatsApp/Instagram/Facebook/TikTok/...),
+// tal cual lo clasifica GHL — no depende de que ninguna automatización recuerde etiquetar el
+// canal (a diferencia de los tags canal_whatsapp/instagram/facebook, que una plantilla
+// compartida dejó de aplicar el 2026-09-01 en las 5 marcas a la vez).
+async function getLastMessageType(brand, contactId) {
+  return rateLimited(async () => {
+    const params = new URLSearchParams({ locationId: brand.locationId, contactId, limit: '1' });
+    const res = await fetch(`https://services.leadconnectorhq.com/conversations/search?${params}`, {
+      headers: { Authorization: `Bearer ${brand.token}`, Version: '2021-04-15' },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`GHL ${res.status}: ${text.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return data.conversations?.[0]?.lastMessageType || null;
+  });
+}
+
 // Trae TODOS los contactos que tengan al menos uno de `tags` (operador contains_set = OR),
 // paginando con searchAfter. Se usa para el análisis de procedencia (sessionSource/campaña),
 // que no se puede filtrar en el propio GHL — hay que leerlo contacto a contacto.
@@ -171,6 +190,7 @@ async function listByAnyTag(brand, tags, gte, lte) {
 
     if (!contacts.length) break;
     all.push(...contacts.map(c => ({
+      id: c.id,
       tags: c.tags || [],
       sessionSource: c.attributionSource?.sessionSource || null,
       campaign: c.attributionSource?.campaign || null,
@@ -185,4 +205,4 @@ async function listByAnyTag(brand, tags, gte, lte) {
   return all;
 }
 
-module.exports = { countTag, countTagPair, countBotField, countAll, listByTag, getContact, listByAnyTag };
+module.exports = { countTag, countTagPair, countBotField, countAll, listByTag, getContact, listByAnyTag, getLastMessageType };
