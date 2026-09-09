@@ -168,51 +168,58 @@ function renderBrandCard(b) {
   </article>`;
 }
 
-// Compara "este mes hasta hoy" contra "el mes anterior hasta el mismo día" por marca, con
-// un bullet chart: la raya vertical marca el punto de referencia del mes anterior, la barra
-// de color es el mes en curso (verde si ya lo supera, ámbar si va por detrás), y dentro de
-// esa barra, un segmento negro marca las citas conseguidas. Solo tiene datos en "Todo" y el
-// mes en curso — un mes cerrado del pasado no tiene un "hoy" con el que compararse.
+// Evolución de cada marca frente al mismo punto del mes anterior: barra divergente centrada
+// en 0% (igual que el mes pasado) — crecer es a la derecha (verde), caer a la izquierda
+// (ámbar). El % de cambio sí es comparable entre marcas de cualquier tamaño, a diferencia de
+// una barra de volumen (donde una marca pequeña siempre parece invisible junto a una
+// grande). Solo tiene datos en "Todo" y el mes en curso — un mes cerrado del pasado no tiene
+// un "hoy" con el que compararse.
 function renderBrandCompare(comparativaMensual) {
   if (!comparativaMensual) {
     $('#brand-compare').innerHTML = '<p class="bd-empty">Sin datos de comparativa para este periodo.</p>';
     return;
   }
-  const { esMesActual } = comparativaMensual;
-  const rows = comparativaMensual.marcas.map(m => {
+  const deltas = comparativaMensual.marcas.map(m => {
     const prev = m.anterior.conversacion;
     const now = m.actual.conversacion;
-    const citas = m.actual.citas;
-    const scale = Math.max(prev, now, 1) * 1.15;
-    const prevPct = (prev / scale * 100).toFixed(1);
-    const nowPct = (now / scale * 100).toFixed(1);
-    const citasPct = (citas / scale * 100).toFixed(1);
-    const supera = now >= prev;
     const delta = prev > 0 ? ((now - prev) / prev * 100) : (now > 0 ? 100 : 0);
-    const tasa = now ? (citas / now * 100) : 0;
+    return { marca: m.marca, delta };
+  });
+  const maxAbs = Math.max(...deltas.map(d => Math.abs(d.delta)), 1);
+
+  $('#brand-compare').innerHTML = deltas.map(({ marca, delta }) => {
+    const supera = delta >= 0;
+    const width = (Math.abs(delta) / maxAbs * 50).toFixed(1); // hasta el 50% del ancho a cada lado del centro
     return `
-    <div class="bmrow">
-      <div class="cmp-name-wrap">
-        <span class="cmp-name">${m.marca}</span>
-        <span class="delta ${supera ? 'up' : 'down'}">${supera ? '▲' : '▼'} ${pct(Math.abs(delta))}%</span>
+    <div class="evo-row">
+      <span class="evo-name">${marca}</span>
+      <div class="evo-bar">
+        <div class="evo-zero"></div>
+        <div class="evo-fill ${supera ? 'up' : 'down'}" style="width:${width}%"></div>
       </div>
-      <div class="bullet">
-        <div class="prev-track"></div>
-        <div class="prev-mark" style="left:${prevPct}%"></div>
-        <div class="now ${supera ? 'up' : 'down'}" style="width:${nowPct}%"></div>
-        <div class="citas" style="width:${citasPct}%"></div>
-      </div>
-      <span class="cmp-value">${pct(tasa)} %</span>
+      <span class="evo-delta ${supera ? 'up' : 'down'}">${supera ? '▲' : '▼'}${pct(Math.abs(delta))}%</span>
     </div>`;
   }).join('');
+}
 
-  $('#brand-compare').innerHTML = `
-    <div class="compare-legend">
-      <span class="li"><i class="tick"></i>${esMesActual ? 'mismo día, mes anterior' : 'mes anterior (completo)'}</span>
-      <span class="li"><i class="sw up"></i>${esMesActual ? 'mes en curso, por delante' : 'supera al mes anterior'}</span>
-      <span class="li"><i class="sw down"></i>por detrás</span>
-      <span class="li"><i class="sw citas"></i>citas</span>
-    </div>
+// Volumen del periodo activo por marca: una sola barra, escala compartida entre las 5
+// marcas (sí comparables entre sí), con cualificado/cita/tasa como cifras exactas al lado —
+// separado de la evolución mensual para no mezclar dos preguntas distintas en un gráfico.
+function renderBrandVolume(marcas) {
+  const maxConv = Math.max(...marcas.map(m => m.conversacion), 1);
+  const rows = marcas.map(m => {
+    const tasa = m.conversacion ? (m.etapa2_cita / m.conversacion * 100) : 0;
+    return `
+    <div class="vol-row">
+      <span class="vol-name">${m.marca}</span>
+      <div class="vol-track"><div class="vol-fill" style="width:${(m.conversacion / maxConv * 100).toFixed(1)}%"></div></div>
+      <span class="vol-num">${fmt(m.etapa1_cualificado)}</span>
+      <span class="vol-num">${fmt(m.etapa2_cita)}</span>
+      <span class="vol-tasa">${pct(tasa)}%</span>
+    </div>`;
+  }).join('');
+  $('#brand-volume').innerHTML = `
+    <div class="vol-head"><span>Marca</span><span>Conversación</span><span>Cualif.</span><span>Cita</span><span>Tasa</span></div>
     ${rows}`;
 }
 
@@ -619,6 +626,7 @@ async function loadSummaryPiece(force) {
     renderKpis(summary.total);
     renderCitasDonut(summary.marcas);
     $('#brands').innerHTML = summary.marcas.map(renderBrandCard).join('');
+    renderBrandVolume(summary.marcas);
     renderBrandCompare(summary.comparativaMensual);
     $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
     store.periods[key] = { ...periodBundle(key), summary };
@@ -633,6 +641,7 @@ async function loadSummaryPiece(force) {
       const msg = `<div class="loading">Error: ${e.message}</div>`;
       $('#brands').innerHTML = msg;
       $('#donut-citas').innerHTML = msg;
+      $('#brand-volume').innerHTML = msg;
       $('#brand-compare').innerHTML = msg;
     }
     throw e;
@@ -721,6 +730,7 @@ function renderBundle(bundle) {
     renderKpis(summary.total);
     renderCitasDonut(summary.marcas);
     $('#brands').innerHTML = summary.marcas.map(renderBrandCard).join('');
+    renderBrandVolume(summary.marcas);
     renderBrandCompare(summary.comparativaMensual);
     $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
   }
@@ -741,7 +751,7 @@ function renderPlaceholder() {
   const msg = periodoIncluyeHoy()
     ? '<div class="loading">Calculando datos de hoy en vivo, puede tardar hasta 1 minuto…</div>'
     : '<div class="loading">Cargando…</div>';
-  ['#brands', '#donut-citas', '#donut-canal', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas', '#brand-compare']
+  ['#brands', '#donut-citas', '#donut-canal', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas', '#brand-volume', '#brand-compare']
     .forEach(sel => { $(sel).innerHTML = msg; });
   $('#heatmap-grid').innerHTML = '';
   $('#trend-chart').innerHTML = '';

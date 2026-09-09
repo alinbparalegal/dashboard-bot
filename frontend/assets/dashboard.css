@@ -102,32 +102,40 @@ h1.title { font-size: 28px; font-weight: 600; }
 .donut-center-value { fill: var(--ink); font-family: ui-monospace, monospace; font-weight: 600; font-size: 17px; }
 .donut-center-label { fill: var(--ink-faint); font-size: 9px; text-transform: uppercase; letter-spacing: 0.03em; }
 
-/* Comparativa entre marcas */
-.compare-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 32px; box-shadow: var(--shadow); }
-.compare-card h2 { font-size: 16px; margin-bottom: 14px; }
-.compare-legend { display: flex; gap: 16px; font-size: 11px; color: var(--ink-faint); margin-bottom: 12px; flex-wrap: wrap; }
-.compare-legend .li { display: flex; align-items: center; gap: 5px; }
-.compare-legend .tick { width: 2px; height: 10px; background: var(--ink-faint); display: inline-block; }
-.compare-legend .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
-.compare-legend .sw.up { background: var(--good); }
-.compare-legend .sw.down { background: var(--warn); }
-.compare-legend .sw.citas { background: var(--ink); }
+/* Comparativa entre marcas: una fila con dos paneles — volumen del periodo (comparable
+   entre marcas, a la izquierda) y evolución vs. mes anterior (a la derecha). Dos preguntas
+   distintas ("¿quién tiene más actividad?" vs. "¿quién está creciendo?"), así que se separan
+   en vez de mezclar dos escalas en el mismo gráfico (fue justo lo que confundía antes). */
+.compare-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 32px; box-shadow: var(--shadow); overflow: hidden; }
+.compare-split { display: grid; grid-template-columns: 60% 1px 40%; }
+.compare-pane { padding: 18px 20px; min-width: 0; }
+.compare-pane h3 { font-size: 14.5px; margin-bottom: 2px; }
+.compare-pane .pane-sub { font-size: 11px; color: var(--ink-faint); margin-bottom: 12px; }
+.compare-divider { background: var(--border); }
+@media (max-width: 760px) { .compare-split { grid-template-columns: 1fr; } .compare-divider { display: none; } }
 
-.bmrow { display: grid; grid-template-columns: 72px 1fr 60px; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
-.bmrow:last-child { border-bottom: none; }
-.bmrow .cmp-name-wrap { display: flex; flex-direction: column; gap: 1px; }
-.bmrow .cmp-name { font-weight: 600; }
-.bmrow .delta { font-family: ui-monospace, monospace; font-size: 10.5px; font-weight: 600; }
-.bmrow .delta.up { color: var(--good); }
-.bmrow .delta.down { color: var(--warn); }
-.bmrow .cmp-value { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink-soft); }
-.bullet { position: relative; height: 22px; }
-.bullet .prev-track { position: absolute; inset: 0; background: var(--surface-alt); border-radius: 4px; }
-.bullet .prev-mark { position: absolute; top: -2px; width: 2px; height: 26px; background: var(--ink-faint); }
-.bullet .now { position: absolute; left: 0; top: 5px; height: 12px; border-radius: 3px; min-width: 2px; }
-.bullet .now.up { background: var(--good); }
-.bullet .now.down { background: var(--warn); }
-.bullet .citas { position: absolute; left: 0; top: 8px; height: 6px; background: var(--ink); border-radius: 2px; min-width: 2px; }
+/* Panel izquierdo: volumen del periodo, una sola barra por marca */
+.vol-head { display: grid; grid-template-columns: 44px 1fr 46px 40px 46px; gap: 8px; font-size: 9.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.03em; padding-bottom: 6px; margin-bottom: 2px; border-bottom: 1px solid var(--border); }
+.vol-row { display: grid; grid-template-columns: 44px 1fr 46px 40px 46px; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.vol-row:last-child { border-bottom: none; }
+.vol-row .vol-name { font-weight: 600; }
+.vol-track { height: 7px; background: var(--surface-alt); border-radius: 3px; overflow: hidden; }
+.vol-fill { height: 100%; background: var(--accent); border-radius: 3px; min-width: 2px; }
+.vol-row .vol-num { font-family: ui-monospace, monospace; text-align: right; color: var(--ink-soft); font-size: 11.5px; }
+.vol-row .vol-tasa { font-family: ui-monospace, monospace; text-align: right; font-weight: 600; font-size: 11.5px; }
+
+/* Panel derecho: % de cambio frente al mes anterior, barra divergente centrada en 0% */
+.evo-row { display: grid; grid-template-columns: 42px 1fr 50px; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.evo-row:last-child { border-bottom: none; }
+.evo-row .evo-name { font-weight: 600; }
+.evo-bar { position: relative; height: 16px; background: var(--surface-alt); border-radius: 4px; }
+.evo-bar .evo-zero { position: absolute; left: 50%; top: -2px; width: 2px; height: 20px; background: var(--ink-faint); }
+.evo-bar .evo-fill { position: absolute; top: 2px; height: 12px; border-radius: 3px; min-width: 2px; }
+.evo-bar .evo-fill.up { background: var(--good); left: 50%; }
+.evo-bar .evo-fill.down { background: var(--warn); right: 50%; }
+.evo-row .evo-delta { font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 600; text-align: right; }
+.evo-row .evo-delta.up { color: var(--good); }
+.evo-row .evo-delta.down { color: var(--warn); }
 .heatmap-grid { display: flex; gap: 4px; flex-wrap: wrap; }
 .heatmap-cell {
   width: 22px; height: 22px; border-radius: 4px; background: var(--surface-alt);
