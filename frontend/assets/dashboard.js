@@ -270,6 +270,9 @@ function themeColors() {
     warn: v('--warn', '#a8752a'),
     cat4: v('--cat4', '#6a6bb0'),
     cat5: v('--cat5', '#b0577a'),
+    cat6: v('--cat6', '#4d7ea8'),
+    cat7: v('--cat7', '#8a6a35'),
+    ink: v('--ink', '#20261f'),
     faint: v('--surface-alt', '#eee'),
   };
 }
@@ -533,10 +536,10 @@ function renderAttribution(data) {
   $('#attribution-computed-at').textContent = data.computedAt ? `Calculado a las ${fmtHora(data.computedAt)}` : '';
 
   const c = themeColors();
-  const palette = [c.accent, c.warn, c.good, c.cat4, c.cat5, c.faint];
+  const palette = [c.accent, c.warn, c.good, c.cat4, c.cat5, c.cat6, c.cat7, c.ink];
   const sorted = Object.entries(data.sessionSource).sort((a, b) => b[1] - a[1]);
-  const top = sorted.slice(0, 5);
-  const restTotal = sorted.slice(5).reduce((s, [, v]) => s + v, 0);
+  const top = sorted.slice(0, 8);
+  const restTotal = sorted.slice(8).reduce((s, [, v]) => s + v, 0);
   const entries = top.map(([label, value], i) => ({ label, value, color: palette[i % palette.length] }));
   if (restTotal > 0) entries.push({ label: 'Otros', value: restTotal, color: c.faint });
   renderDonut('#donut-sessionsource', entries, 'leads');
