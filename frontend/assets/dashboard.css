@@ -82,6 +82,7 @@ h1.title { font-size: 28px; font-weight: 600; }
 /* Gráfica de tendencia */
 .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow); }
 .chart-card h2 { font-size: 16px; margin-bottom: 12px; }
+section.chart-card { margin-bottom: 32px; }
 #trend-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
 #trend-chart .grid-line { stroke: var(--border); stroke-width: 1; }
 #trend-chart .series-line { fill: none; stroke-width: 2; }

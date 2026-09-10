@@ -69,6 +69,7 @@ const CANAL_DE_TIPO = {
   TYPE_INSTAGRAM: 'canal_instagram',
   TYPE_FACEBOOK: 'canal_facebook',
 };
+const LABEL_CANAL = { canal_whatsapp: 'WhatsApp', canal_instagram: 'Instagram', canal_facebook: 'Facebook' };
 
 // Canal de entrada, procedencia real (sessionSource/TikTok) y campañas de UN día, para UNA
 // marca. Acotado a un solo día, el listado de contactos con algún tag de estado (para
@@ -86,10 +87,13 @@ async function computeAtribucionDiaria(brand, fecha) {
     const canalTag = CANAL_DE_TIPO[lastMessageType];
     if (canalTag) canales[canalTag]++;
 
-    // TikTok: GHL ya lo distingue como canal propio (TYPE_TIKTOK) cuando hay conversación —
-    // más directo que la heurística de UTM/referrer, que se mantiene como respaldo para
-    // leads que llegan con ese origen pero sin llegar a escribir.
-    const src = (lastMessageType === 'TYPE_TIKTOK' || esTikTok(c)) ? 'TikTok' : (c.sessionSource || 'Desconocido');
+    // Procedencia real: si hay canal de mensajería identificado (WhatsApp/Instagram/
+    // Facebook), manda sobre la clasificación genérica de GHL — es más concreto saber por
+    // dónde escribe que si GHL lo etiquetó como "Direct traffic" u "Organic Search". TikTok
+    // (TYPE_TIKTOK, o la heurística de UTM/referrer como respaldo si no llegó a escribir) va
+    // justo después; el resto cae en el sessionSource de GHL como antes.
+    const esTk = lastMessageType === 'TYPE_TIKTOK' || esTikTok(c);
+    const src = canalTag ? LABEL_CANAL[canalTag] : (esTk ? 'TikTok' : (c.sessionSource || 'Desconocido'));
     session_source[src] = (session_source[src] || 0) + 1;
     if (c.campaign) {
       // "Paid Social" es el único sessionSource que GHL solo asigna cuando detecta un clic

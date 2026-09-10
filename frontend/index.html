@@ -98,25 +98,19 @@
         <div id="donut-citas"></div>
       </div>
       <div class="chart-card">
-        <h2>Procedencia de los leads</h2>
-        <div id="donut-canal"></div>
+        <div class="header-top">
+          <h2>Procedencia real</h2>
+          <span id="attribution-computed-at" class="tl-computed"></span>
+        </div>
+        <p class="detail-intro">Canal de mensajería (WhatsApp/Instagram/Facebook/TikTok) cuando hay conversación; si no, el origen de tráfico que asigna GHL.</p>
+        <div id="donut-sessionsource"><div class="loading">Cargando…</div></div>
       </div>
     </section>
 
-    <section class="panels-grid">
-      <div class="chart-card">
-        <div class="header-top">
-          <h2>Procedencia real (sessionSource)</h2>
-          <span id="attribution-computed-at" class="tl-computed"></span>
-        </div>
-        <p class="detail-intro">Acotado a los leads que sí entraron en el funnel del bot (mejor cobertura que los tags de canal).</p>
-        <div id="donut-sessionsource"><div class="loading">Cargando…</div></div>
-      </div>
-      <div class="chart-card">
-        <h2>Rendimiento por campaña</h2>
-        <p class="detail-intro">Leads con UTM de campaña, separados en pago real (Paid Social) y orgánico etiquetado a mano (bio, búsqueda). Ordenado por volumen.</p>
-        <div id="tabla-campanas"><div class="loading">Cargando…</div></div>
-      </div>
+    <section class="chart-card">
+      <h2>Rendimiento por campaña</h2>
+      <p class="detail-intro">Leads con UTM de campaña, separados en pago real (Paid Social) y orgánico etiquetado a mano (bio, búsqueda). Ordenado por volumen.</p>
+      <div id="tabla-campanas"><div class="loading">Cargando…</div></div>
     </section>
 
     <section class="brands" id="brands" aria-label="Funnel por marca"></section>

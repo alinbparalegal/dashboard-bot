@@ -325,25 +325,6 @@ function renderCitasDonut(marcas) {
   renderDonut('#donut-citas', entries, 'citas');
 }
 
-function renderChannelsDonut(data, totalConversacion) {
-  const c = themeColors();
-  const labels = { canal_whatsapp: 'WhatsApp', canal_instagram: 'Instagram', canal_facebook: 'Facebook' };
-  const colors = { canal_whatsapp: c.good, canal_instagram: c.cat5, canal_facebook: c.accent };
-  const totales = { canal_whatsapp: 0, canal_instagram: 0, canal_facebook: 0 };
-  data.marcas.forEach(m => {
-    Object.keys(totales).forEach(tag => { totales[tag] += m.canales[tag] || 0; });
-  });
-  const sumCanales = Object.values(totales).reduce((s, v) => s + v, 0);
-  const sinCanal = Math.max(0, totalConversacion - sumCanales);
-
-  const entries = [
-    { label: labels.canal_whatsapp, value: totales.canal_whatsapp, color: colors.canal_whatsapp },
-    { label: labels.canal_instagram, value: totales.canal_instagram, color: colors.canal_instagram },
-    { label: labels.canal_facebook, value: totales.canal_facebook, color: colors.canal_facebook },
-    { label: 'Sin canal registrado', value: sinCanal, color: c.faint },
-  ];
-  renderDonut('#donut-canal', entries, 'leads');
-}
 
 function monthName(m) {
   return ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][m];
@@ -591,7 +572,7 @@ function periodKey() {
 }
 
 // Las pestañas de periodo son navegación, no un dato más: no deben depender de que termine
-// ninguna consulta lenta (summary/channels/etc. pueden tardar cuando GHL va lento para "hoy").
+// ninguna consulta lenta (summary/timeline/etc. pueden tardar cuando GHL va lento para "hoy").
 // /launch-date no toca Mongo ni GHL, así que las pestañas aparecen siempre, pase lo que pase
 // con el resto de la carga.
 async function loadLaunchDateAndBuildTabs() {
@@ -661,23 +642,6 @@ async function loadDailyPiece() {
   }
 }
 
-// Necesita el total de conversación del resumen para calcular "sin canal registrado", así
-// que espera a esa pieza (pero no a timeline/atribución, que van cada una por su lado).
-async function loadChannelsPiece(summaryPromise, force) {
-  const key = periodKey();
-  const forceQuery = force ? { force: 'true' } : {};
-  try {
-    const [channels, summary] = await Promise.all([fetchJSON(`/api/stats/channels${apiQuery(forceQuery)}`), summaryPromise]);
-    if (periodKey() !== key) return;
-    if (!summary) { $('#donut-canal').innerHTML = '<div class="loading">Sin datos (falló el resumen).</div>'; return; }
-    renderChannelsDonut(channels, summary.total.conversacion);
-    store.periods[key] = { ...periodBundle(key), channels };
-    saveStore();
-  } catch (e) {
-    if (periodKey() === key) $('#donut-canal').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
-  }
-}
-
 async function loadTimelinePiece(force) {
   const key = periodKey();
   const forceQuery = force ? { force: 'true' } : {};
@@ -708,9 +672,8 @@ async function loadAttributionPiece(force) {
 }
 
 function loadAllPieces(force) {
-  const summaryPromise = loadSummaryPiece(force).catch(() => null);
+  loadSummaryPiece(force).catch(() => {});
   loadDailyPiece();
-  loadChannelsPiece(summaryPromise, force);
   loadTimelinePiece(force);
   loadAttributionPiece(force);
 }
@@ -725,7 +688,7 @@ function loadPeriod() {
 // Pinta un bundle ya guardado en caché (recarga de página, o cambio a una pestaña ya vista).
 // Tolera bundles parciales: si alguna pieza falló la última vez, sencillamente no la pinta.
 function renderBundle(bundle) {
-  const { summary, daily, channels, timeline, attribution } = bundle;
+  const { summary, daily, timeline, attribution } = bundle;
   if (summary) {
     renderKpis(summary.total);
     renderCitasDonut(summary.marcas);
@@ -735,7 +698,6 @@ function renderBundle(bundle) {
     $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
   }
   if (daily) renderHeatmapAndTrend(daily);
-  if (channels && summary) renderChannelsDonut(channels, summary.total.conversacion);
   if (timeline) { renderTimeline(timeline.marcas, timeline.computedAt); renderUltimasCitas(timeline.marcas); }
   if (attribution) renderAttribution(attribution);
 }
@@ -751,7 +713,7 @@ function renderPlaceholder() {
   const msg = periodoIncluyeHoy()
     ? '<div class="loading">Calculando datos de hoy en vivo, puede tardar hasta 1 minuto…</div>'
     : '<div class="loading">Cargando…</div>';
-  ['#brands', '#donut-citas', '#donut-canal', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas', '#brand-volume', '#brand-compare']
+  ['#brands', '#donut-citas', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas', '#brand-volume', '#brand-compare']
     .forEach(sel => { $(sel).innerHTML = msg; });
   $('#heatmap-grid').innerHTML = '';
   $('#trend-chart').innerHTML = '';
