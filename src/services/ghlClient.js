@@ -7,9 +7,28 @@ const MIN_INTERVAL_MS = 420; // ~2.4 req/s, con margen
 
 let queue = Promise.resolve();
 
+const MAX_INTENTOS = 3;
+const RETRY_BASE_MS = 800;
+
+// GHL devuelve de vez en cuando errores transitorios (429, 500, 504, o el curioso 401
+// "Command timed out" que ya vimos en los backfills) que se resuelven solos al reintentar.
+// Sin esto, un solo fallo puntual tiraba todo el cálculo en vivo (ej. "hoy") con un 500.
+async function conReintentos(fn) {
+  let ultimoError;
+  for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+    try {
+      return await fn();
+    } catch (e) {
+      ultimoError = e;
+      if (intento < MAX_INTENTOS) await new Promise(r => setTimeout(r, RETRY_BASE_MS * intento));
+    }
+  }
+  throw ultimoError;
+}
+
 function rateLimited(fn) {
   const run = queue.then(async () => {
-    const result = await fn();
+    const result = await conReintentos(fn);
     await new Promise(r => setTimeout(r, MIN_INTERVAL_MS));
     return result;
   });
