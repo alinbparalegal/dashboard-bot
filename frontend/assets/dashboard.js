@@ -432,7 +432,7 @@ async function showDayDetail(fecha) {
             <td>${r.marca}</td>
             <td>${fmt(r.conversacion)}</td>
             <td>${fmt(r.lead_potencial + r.pago_pendiente + r.consulta_agendada + r.cliente_postventa)}</td>
-            <td>${fmt(r.consulta_agendada)}</td>
+            <td>${fmt(r.citas_fiables || 0)}</td>
           </tr>`).join('')}
         </tbody>
       </table>`;

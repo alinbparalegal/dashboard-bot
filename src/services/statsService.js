@@ -111,27 +111,44 @@ async function computeAtribucionDiaria(brand, fecha) {
     }
   });
 
-  // Citas conseguidas ese día (misma verificación/gestión que el timeline), acotado a un
-  // día: listByTag no pagina, pero un solo día nunca se acerca al límite de 100.
+  return { canales, session_source, campanas: [...campanasMap.values()] };
+}
+
+// Detalle + verificación de fiabilidad de las citas (tag consulta_agendada) de UN día, para
+// UNA marca. Acotado a un solo día: listByTag no pagina, pero un solo día nunca se acerca al
+// límite de 100, y el número de citas por día es pequeño (a diferencia del resto de contactos
+// del día), así que sale barato calcularlo incluso dentro del bloque "core" (rápido).
+//
+// "Fiable" = gestionada por el BOT + tag `pago info` + campo "Fecha de Pago" ya relleno. Antes
+// se contaba como cita cualquier contacto con el tag consulta_agendada, pero eso puede incluir
+// casos sin pago real confirmado; estas tres condiciones juntas son las que el equipo valida
+// como cita/pago real (ver también el 100% de acierto de `pago info` en computeCitasTimeline).
+async function computeCitasFiables(brand, fecha) {
   const citasContactos = await ghl.listByTag(brand, 'consulta_agendada', fecha, fecha);
+  if (!citasContactos.length) return { citas: [], citas_fiables: 0 };
+
   const citasDetalles = await Promise.all(citasContactos.map(c => ghl.getContact(brand, c.id)));
-  const gestionadoPorDe = detalle => {
-    const cf = (detalle?.customFields || []).find(f => f.id === brand.botFieldId);
-    return cf?.value || null;
-  };
+  const valorCampo = (detalle, fieldId) => (detalle?.customFields || []).find(f => f.id === fieldId)?.value || null;
+
   const citas = citasContactos.map((c, i) => {
-    const gestionadoPor = gestionadoPorDe(citasDetalles[i]);
+    const detalle = citasDetalles[i];
+    const gestionadoPor = valorCampo(detalle, brand.botFieldId);
+    const fechaPago = valorCampo(detalle, brand.fechaPagoFieldId);
+    const verificado = c.tags.includes('pago info');
+    const esBot = gestionadoPor === 'BOT';
     return {
       contactId: c.id,
       nombre: c.nombre,
       fecha: c.dateAdded,
-      verificado: c.tags.includes('pago info'),
+      verificado,
       gestionadoPor,
-      esBot: gestionadoPor === 'BOT',
+      esBot,
+      fechaPago,
+      fiable: esBot && verificado && !!fechaPago,
     };
   });
 
-  return { canales, session_source, campanas: [...campanasMap.values()], citas };
+  return { citas, citas_fiables: citas.filter(c => c.fiable).length };
 }
 
 // Conteos "core" (conversación/cualificado/cita y sus desgloses) de una marca para UN día,
@@ -163,6 +180,11 @@ async function computeCoreDiario(brand, fecha) {
 
   const meta_ads_potencial = await ghl.countTagPair(brand, 'lead_potencial', 'meta', fecha, fecha);
 
+  // consulta_agendada (tag crudo) sigue contando para el funnel/conversación tal cual siempre
+  // lo hizo; citas_fiables (BOT + pago info + fecha de pago) es la que se usa como "cita" real
+  // en KPIs, comparativas e ingreso estimado — ver computeCitasFiables.
+  const { citas, citas_fiables } = await computeCitasFiables(brand, fecha);
+
   const conversacion = lead_cualificando + lead_potencial + pago_pendiente + consulta_agendada + cliente_postventa + lead_no_potencial;
 
   return {
@@ -178,6 +200,8 @@ async function computeCoreDiario(brand, fecha) {
     motivos_descarte,
     tramites_potencial,
     meta_ads_potencial,
+    citas,
+    citas_fiables,
   };
 }
 
@@ -185,15 +209,14 @@ async function computeCoreDiario(brand, fecha) {
 // (cron nocturno, self-heal y backfill). No se usa para lecturas en vivo de "hoy" (ver
 // getLiveTodayStats y getLiveAtribucionToday, que piden cada bloque por separado y más barato).
 async function computeDailyStatsForBrand(brand, fecha) {
-  const core = await computeCoreDiario(brand, fecha);
-  const { canales, session_source, campanas, citas } = await computeAtribucionDiaria(brand, fecha);
+  const core = await computeCoreDiario(brand, fecha); // incluye citas/citas_fiables
+  const { canales, session_source, campanas } = await computeAtribucionDiaria(brand, fecha);
 
   return {
     ...core,
     canales,
     session_source,
     campanas,
-    citas,
     statsVersion: 2,
     computedAt: new Date(),
   };
@@ -231,9 +254,11 @@ async function upsertDailyStatsAllBrands(fecha) {
 function stageTotals(d) {
   return {
     conversacion: d.conversacion,
-    cualificado: d.lead_potencial + d.pago_pendiente + d.consulta_agendada + d.cliente_postventa,
+    // "cualificado" sigue contando el tag crudo consulta_agendada (progreso en el funnel);
     // cliente_postventa es posventa, no una cita real — no cuenta aquí.
-    cita: d.consulta_agendada,
+    cualificado: d.lead_potencial + d.pago_pendiente + d.consulta_agendada + d.cliente_postventa,
+    // "cita" real solo cuenta las verificadas (BOT + pago info + fecha de pago), ver computeCitasFiables.
+    cita: d.citas_fiables || 0,
   };
 }
 
@@ -354,7 +379,7 @@ async function getSummary(desde, hasta, mesReferencia) {
       marca: brand.code,
       nombre: brand.name,
       conversacion: 0, lead_cualificando: 0, lead_potencial: 0, pago_pendiente: 0,
-      consulta_agendada: 0, cliente_postventa: 0, lead_no_potencial: 0,
+      consulta_agendada: 0, cliente_postventa: 0, lead_no_potencial: 0, citas_fiables: 0,
       motivos_descarte: {}, tramites_potencial: {}, meta_ads_potencial: 0,
     };
 
@@ -367,6 +392,7 @@ async function getSummary(desde, hasta, mesReferencia) {
       acc.consulta_agendada += d.consulta_agendada;
       acc.cliente_postventa += d.cliente_postventa;
       acc.lead_no_potencial += d.lead_no_potencial;
+      acc.citas_fiables += d.citas_fiables || 0;
       mergeMaps(acc.motivos_descarte, d.motivos_descarte instanceof Map ? Object.fromEntries(d.motivos_descarte) : d.motivos_descarte);
       mergeMaps(acc.tramites_potencial, d.tramites_potencial instanceof Map ? Object.fromEntries(d.tramites_potencial) : d.tramites_potencial);
       acc.meta_ads_potencial += d.meta_ads_potencial;
@@ -381,15 +407,17 @@ async function getSummary(desde, hasta, mesReferencia) {
       acc.consulta_agendada += live.consulta_agendada;
       acc.cliente_postventa += live.cliente_postventa;
       acc.lead_no_potencial += live.lead_no_potencial;
+      acc.citas_fiables += live.citas_fiables || 0;
       mergeMaps(acc.motivos_descarte, live.motivos_descarte);
       mergeMaps(acc.tramites_potencial, live.tramites_potencial);
       acc.meta_ads_potencial += live.meta_ads_potencial;
     }
 
     acc.etapa1_cualificado = acc.lead_potencial + acc.pago_pendiente + acc.consulta_agendada + acc.cliente_postventa;
-    // Cita = solo consulta_agendada. cliente_postventa es posventa (el bot no gestiona esa fase),
-    // no una cita real, así que no debe inflar este conteo.
-    acc.etapa2_cita = acc.consulta_agendada;
+    // Cita = solo las verificadas: gestionada por el BOT + tag "pago info" + fecha de pago ya
+    // rellena (ver computeCitasFiables). El tag consulta_agendada por sí solo puede incluir
+    // casos sin pago real confirmado.
+    acc.etapa2_cita = acc.citas_fiables;
     acc.etapa3_venta = acc.cliente_postventa;
 
     // Ingreso estimado de las citas: no hay tag de modalidad (online/presencial) fiable en GHL,
@@ -450,7 +478,7 @@ async function computeComparativaMensual(mesReferencia) {
 
   const sumaConversacionCitas = docs => docs.reduce((acc, d) => ({
     conversacion: acc.conversacion + d.conversacion,
-    citas: acc.citas + d.consulta_agendada,
+    citas: acc.citas + (d.citas_fiables || 0),
   }), { conversacion: 0, citas: 0 });
 
   const marcas = await Promise.all(brands.map(async brand => {
@@ -464,7 +492,7 @@ async function computeComparativaMensual(mesReferencia) {
     const actualCerrado = sumaConversacionCitas(actualDocs);
     const anterior = sumaConversacionCitas(anteriorDocs);
     const actual = esMesActual
-      ? { conversacion: actualCerrado.conversacion + live.conversacion, citas: actualCerrado.citas + live.consulta_agendada }
+      ? { conversacion: actualCerrado.conversacion + live.conversacion, citas: actualCerrado.citas + (live.citas_fiables || 0) }
       : actualCerrado;
     return { marca: brand.code, nombre: brand.name, actual, anterior };
   }));
@@ -515,7 +543,7 @@ async function computeCitasTimeline(desde, hasta, force = false) {
     const docs = await DailyStat.find({ marca: brand.code, fecha: { $gte: desde, $lte: hasta } }).lean();
     const citas = docs.flatMap(d => d.citas || []);
     if (hasta === todayStr()) {
-      const live = await getLiveAtribucionToday(brand, force);
+      const live = await getLiveTodayStats(brand, force);
       citas.push(...(live.citas || []));
     }
     citas.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));

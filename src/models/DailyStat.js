@@ -11,6 +11,11 @@ const dailyStatSchema = new mongoose.Schema({
   consulta_agendada: { type: Number, default: 0 },
   cliente_postventa: { type: Number, default: 0 },
   lead_no_potencial: { type: Number, default: 0 },
+  // Subconjunto de consulta_agendada verificado como cita/pago real: gestionado por el BOT +
+  // tag "pago info" + campo "Fecha de Pago" ya relleno (ver computeCitasFiables). Es lo que
+  // cuenta como "cita" en KPIs/comparativas/ingreso estimado; consulta_agendada de arriba
+  // sigue siendo el tag crudo, para el funnel de conversación.
+  citas_fiables: { type: Number, default: 0 },
 
   motivos_descarte: { type: Map, of: Number, default: {} },
   tramites_potencial: { type: Map, of: Number, default: {} },
@@ -36,7 +41,8 @@ const dailyStatSchema = new mongoose.Schema({
   }],
 
   // Citas conseguidas ese día (tag consulta_agendada, fecha de creación del lead), con
-  // verificación (tag "pago info") y gestión bot/humano — misma info que el timeline.
+  // verificación (tag "pago info"), gestión bot/humano, fecha de pago y si es "fiable"
+  // (esBot && verificado && fechaPago) — misma info que el timeline.
   citas: [{
     contactId: String,
     nombre: String,
@@ -44,6 +50,8 @@ const dailyStatSchema = new mongoose.Schema({
     verificado: Boolean,
     gestionadoPor: String,
     esBot: Boolean,
+    fechaPago: String,
+    fiable: Boolean,
     _id: false,
   }],
 
