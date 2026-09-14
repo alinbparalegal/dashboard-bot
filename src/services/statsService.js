@@ -15,7 +15,7 @@ function isToday(fecha) {
 // seguidos, la cola de rate-limit se satura y las respuestas tardan más de un minuto.
 // Se cachea la PROMESA (no solo el resultado) para que peticiones concurrentes compartan
 // el mismo cálculo en curso en vez de disparar cada una su propia tanda de llamadas.
-const LIVE_TODAY_TTL_MS = 3 * 60 * 1000;
+const LIVE_TODAY_TTL_MS = 12 * 60 * 1000;
 const liveTodayCache = new Map(); // brandCode -> { fecha, promise, expiresAt }
 
 function getLiveTodayStats(brand, force = false) {
