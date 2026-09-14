@@ -212,10 +212,18 @@ async function upsertDailyStats(brandCode, fecha) {
   return stats;
 }
 
+// Aisla el fallo de una marca: antes, si una marca lanzaba (ej. un fallo de GHL), el bucle
+// se paraba ahi y las marcas siguientes de ESE dia se quedaban sin guardar esa noche (aunque
+// no tuvieran ningun problema) — así CYA/NAC, las de mas volumen y mas llamadas a GHL, podian
+// arrastrar a las marcas que venian detras en la lista y dejar el dia entero a medias.
 async function upsertDailyStatsAllBrands(fecha) {
   const results = [];
   for (const brand of getBrands()) {
-    results.push(await upsertDailyStats(brand.code, fecha));
+    try {
+      results.push(await upsertDailyStats(brand.code, fecha));
+    } catch (e) {
+      console.error(`[upsertDailyStatsAllBrands] Error en ${brand.code} ${fecha}:`, e.message);
+    }
   }
   return results;
 }
@@ -302,12 +310,24 @@ async function getDetailForDate(fecha) {
     return Promise.all(brands.map(brand => getLiveTodayStats(brand)));
   }
 
+  const brands = getBrands();
   const stored = await DailyStat.find({ fecha }).lean();
-  if (stored.length) return stored;
+  if (stored.length === brands.length) return stored;
 
-  // Día cerrado sin foto guardada (ej. el cron no llegó a ejecutarse esa noche):
-  // se calcula en vivo para ESA fecha en concreto (nunca "hoy") y se guarda para la próxima vez.
-  return Promise.all(getBrands().map(brand => upsertDailyStats(brand.code, fecha)));
+  // Día cerrado con alguna marca sin foto guardada (ej. el cron falló para esa marca esa
+  // noche, ver upsertDailyStatsAllBrands): se recalculan en vivo SOLO las que faltan, una a
+  // una (no en paralelo) para que el fallo de una no tire el cálculo de las demás.
+  const yaGuardadas = new Set(stored.map(d => d.marca));
+  const faltantes = brands.filter(b => !yaGuardadas.has(b.code));
+  const recalculadas = [];
+  for (const brand of faltantes) {
+    try {
+      recalculadas.push(await upsertDailyStats(brand.code, fecha));
+    } catch (e) {
+      console.error(`[getDetailForDate] Error en ${brand.code} ${fecha}:`, e.message);
+    }
+  }
+  return [...stored, ...recalculadas];
 }
 
 function mergeMaps(target, source) {
