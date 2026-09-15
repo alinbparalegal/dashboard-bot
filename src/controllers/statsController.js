@@ -1,5 +1,12 @@
 const statsService = require('../services/statsService');
 
+// Endpoint TEMPORAL de diagnóstico: qué valor de fechaPagoFieldId tiene cargado AHORA MISMO
+// el proceso vivo, para descartar que sea un problema de variables de entorno no recogidas.
+function debugFields(req, res) {
+  const { getBrands } = require('../config/brands');
+  res.status(200).json(getBrands().map(b => ({ marca: b.code, fechaPagoFieldId: b.fechaPagoFieldId, botFieldId: b.botFieldId })));
+}
+
 // Sin Mongo ni GHL: las pestañas de periodo (Todo/mes) necesitan saber desde cuándo hay
 // datos, pero no deberían depender de que termine ninguna consulta lenta para aparecer.
 function getLaunchDate(req, res) {
@@ -86,4 +93,4 @@ async function getAttribution(req, res) {
   }
 }
 
-module.exports = { getLaunchDate, getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution };
+module.exports = { getLaunchDate, getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution, debugFields };
