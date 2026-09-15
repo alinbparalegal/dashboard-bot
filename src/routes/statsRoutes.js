@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getLaunchDate, getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution, debugFields } = require('../controllers/statsController');
+const { getLaunchDate, getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution, debugFields, runBackfillCitasFiables } = require('../controllers/statsController');
 
 router.get('/launch-date', getLaunchDate);
 router.get('/daily', getDailyTotals);
@@ -10,5 +10,6 @@ router.get('/channels', getChannels);
 router.get('/timeline', getTimeline);
 router.get('/attribution', getAttribution);
 router.get('/_debug-fields', debugFields); // temporal, se borra tras el diagnóstico
+router.get('/_backfill-citas-fiables', runBackfillCitasFiables); // temporal, se borra tras usarlo
 
 module.exports = router;

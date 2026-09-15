@@ -7,6 +7,37 @@ function debugFields(req, res) {
   res.status(200).json(getBrands().map(b => ({ marca: b.code, fechaPagoFieldId: b.fechaPagoFieldId, botFieldId: b.botFieldId })));
 }
 
+// Endpoint TEMPORAL de un solo uso: recalcula (upsert) el histórico de un rango de días ya
+// cerrados con la nueva lógica de citas_fiables. Relanzado tras corregir las variables de
+// entorno de fechaPagoFieldId (estaban en el servicio de Render equivocado). Se borra en
+// cuanto termine el backfill.
+function dateRangeArray(desdeStr, hastaStr) {
+  const dates = [];
+  const cur = new Date(desdeStr + 'T00:00:00Z');
+  const end = new Date(hastaStr + 'T00:00:00Z');
+  while (cur <= end) {
+    dates.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+async function runBackfillCitasFiables(req, res) {
+  const { desde, hasta } = req.query;
+  if (!desde || !hasta) return res.status(400).json({ message: 'Faltan desde/hasta' });
+  const fechas = dateRangeArray(desde, hasta);
+  const resultado = [];
+  for (const fecha of fechas) {
+    try {
+      await statsService.upsertDailyStatsAllBrands(fecha);
+      resultado.push({ fecha, ok: true });
+    } catch (e) {
+      resultado.push({ fecha, ok: false, error: e.message });
+    }
+  }
+  res.status(200).json({ fechas: resultado.length, resultado });
+}
+
 // Sin Mongo ni GHL: las pestañas de periodo (Todo/mes) necesitan saber desde cuándo hay
 // datos, pero no deberían depender de que termine ninguna consulta lenta para aparecer.
 function getLaunchDate(req, res) {
@@ -93,4 +124,4 @@ async function getAttribution(req, res) {
   }
 }
 
-module.exports = { getLaunchDate, getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution, debugFields };
+module.exports = { getLaunchDate, getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution, debugFields, runBackfillCitasFiables };
