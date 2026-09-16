@@ -223,6 +223,10 @@ function renderBrandVolume(marcas) {
     ${rows}`;
 }
 
+// Fusiona el heatmap "Leads tratados" con la tendencia: los puntos de la serie de
+// conversación llevan el mismo color por intensidad que antes tenían las celdas del
+// heatmap (ver colorForIntensity) y son clicables para el detalle del día — así un solo
+// gráfico hace las dos cosas en vez de repetir el eje de fechas en dos sitios.
 function buildTrendSvg(daily) {
   const W = 700, H = 220, padL = 4, padR = 4, padT = 10, padB = 18;
   const innerW = W - padL - padR, innerH = H - padT - padB;
@@ -230,12 +234,23 @@ function buildTrendSvg(daily) {
   const n = daily.length;
   const x = i => padL + (n === 1 ? 0 : (i / (n - 1)) * innerW);
   const y = v => padT + innerH - (v / maxV) * innerH;
+  const today = toDateStr(new Date());
+  const yesterday = toDateStr(new Date(Date.now() - 86400000));
 
   function pathFor(key) {
     return daily.map((d, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(d[key]).toFixed(1)}`).join(' ');
   }
   function pointsFor(key, color) {
     return daily.map((d, i) => `<circle class="series-point" cx="${x(i).toFixed(1)}" cy="${y(d[key]).toFixed(1)}" r="2.2" stroke="${color}"><title>${d.fecha}: ${fmt(d[key])}</title></circle>`).join('');
+  }
+  function conversacionPoints(color) {
+    return daily.map((d, i) => {
+      const marcado = d.fecha === today || d.fecha === yesterday;
+      return `<circle class="series-point-conv" data-fecha="${d.fecha}" cx="${x(i).toFixed(1)}" cy="${y(d.conversacion).toFixed(1)}"
+        r="5" fill="${colorForIntensity(d.conversacion, maxV)}" stroke="${marcado ? color : 'transparent'}" stroke-width="1.6">
+        <title>${d.fecha}: ${fmt(d.conversacion)} — clic para el detalle</title>
+      </circle>`;
+    }).join('');
   }
 
   const gridLines = [0, 0.5, 1].map(t => `<line class="grid-line" x1="${padL}" x2="${W - padR}" y1="${(padT + innerH * (1 - t)).toFixed(1)}" y2="${(padT + innerH * (1 - t)).toFixed(1)}" />`).join('');
@@ -253,9 +268,9 @@ function buildTrendSvg(daily) {
     <path class="series-line" d="${pathFor('conversacion')}" stroke="${accent}" />
     <path class="series-line" d="${pathFor('cualificado')}" stroke="${good}" />
     <path class="series-line" d="${pathFor('cita')}" stroke="${warn}" />
-    ${pointsFor('conversacion', accent)}
     ${pointsFor('cualificado', good)}
     ${pointsFor('cita', warn)}
+    ${conversacionPoints(accent)}
     <text class="axis-label" x="${padL}" y="${H - 4}">${firstLabel}</text>
     <text class="axis-label" x="${W - padR}" y="${H - 4}" text-anchor="end">${lastLabel}</text>
   </svg>`;
@@ -335,8 +350,7 @@ function monthName(m) {
 
 function updateHeatmapTitles(tabLabel) {
   const suffix = tabLabel === 'Todo' ? 'últimos 30 días' : tabLabel;
-  $('#heatmap-title').textContent = `Leads tratados — ${suffix}`;
-  $('#trend-title').textContent = `Tendencia — ${suffix}`;
+  $('#trend-title').textContent = `Leads tratados — tendencia · ${suffix}`;
 }
 
 function buildPeriodTabs(launchDate) {
@@ -395,23 +409,10 @@ function colorForIntensity(v, max) {
 }
 
 function renderHeatmapAndTrend(daily) {
-  const max = Math.max(...daily.map(d => d.conversacion), 1);
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-
-  const grid = $('#heatmap-grid');
-  grid.innerHTML = daily.map(d => {
-    const cls = ['heatmap-cell'];
-    if (d.fecha === today) cls.push('today');
-    else if (d.fecha === yesterday) cls.push('recent');
-    return `<div class="${cls.join(' ')}" style="background:${colorForIntensity(d.conversacion, max)}" title="${d.fecha}: ${d.conversacion}" data-fecha="${d.fecha}"></div>`;
-  }).join('');
-
-  grid.querySelectorAll('.heatmap-cell').forEach(cell => {
-    cell.addEventListener('click', () => showDayDetail(cell.dataset.fecha));
-  });
-
   $('#trend-chart').innerHTML = buildTrendSvg(daily);
+  $('#trend-chart').querySelectorAll('.series-point-conv').forEach(point => {
+    point.addEventListener('click', () => showDayDetail(point.dataset.fecha));
+  });
 }
 
 // Detalle de un día concreto del heatmap: se pide en el momento (acción explícita del
@@ -746,7 +747,6 @@ function renderPlaceholder() {
     : '<div class="loading">Cargando…</div>';
   ['#brands', '#donut-citas', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas', '#brand-volume', '#brand-compare']
     .forEach(sel => { $(sel).innerHTML = msg; });
-  $('#heatmap-grid').innerHTML = '';
   $('#trend-chart').innerHTML = '';
   $('#kpi-conversacion').textContent = '—';
   $('#kpi-cualificado').textContent = '—';

@@ -79,13 +79,13 @@ h1.title { font-size: 28px; font-weight: 600; }
 .kpi-citas-split { display: grid; grid-template-columns: 3fr 7fr; gap: 16px; margin-bottom: 32px; align-items: stretch; }
 .kpis-pane { display: flex; flex-direction: column; background: var(--surface);
   border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
-.kpi { padding: 13px 20px; display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--separator-inset); }
+.kpi { padding: 13px 20px; display: flex; align-items: flex-start; gap: 12px; border-top: 1px solid var(--separator-inset); }
 .kpi:first-of-type { border-top: none; }
-.kpi-icon { width: 30px; height: 30px; border-radius: 8px; flex: 0 0 auto; display: flex; align-items: center;
+.kpi-icon { width: 30px; height: 30px; border-radius: 8px; flex: 0 0 auto; margin-top: 1px; display: flex; align-items: center;
   justify-content: center; color: #fff; font-size: 14px; }
 .kpi-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.kpi .label { font-size: 14px; font-weight: 600; color: var(--ink); }
-.kpi .value { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 19px; font-weight: 700; flex: 0 0 auto; }
+.kpi .label { font-size: 12.5px; font-weight: 600; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.02em; }
+.kpi .value { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; margin: 1px 0; }
 .kpi .sub { font-size: 11.5px; color: var(--ink-faint); }
 .kpi.accent .value { color: var(--accent-ink); }
 .citas-pane { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 18px 20px; min-width: 0; }
@@ -99,13 +99,9 @@ h1.title { font-size: 28px; font-weight: 600; }
 .badge.ok { background: var(--accent-soft); color: var(--accent-ink); }
 .badge.warn { background: var(--warn-soft); color: var(--warn); }
 
-/* Panel de dos columnas: heatmap + tendencia */
+/* Panel de dos columnas (comparativas, etc.) */
 .panels-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; align-items: start; }
 @media (max-width: 860px) { .panels-grid { grid-template-columns: 1fr; } }
-
-/* Heatmap */
-.heatmap-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
-.heatmap-card h2 { font-size: 16px; margin-bottom: 12px; }
 
 /* Gráfica de tendencia */
 .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
@@ -115,6 +111,8 @@ section.chart-card { margin-bottom: 32px; }
 #trend-chart .grid-line { stroke: var(--border); stroke-width: 1; }
 #trend-chart .series-line { fill: none; stroke-width: 2; }
 #trend-chart .series-point { fill: var(--surface); stroke-width: 1.6; }
+#trend-chart .series-point-conv { cursor: pointer; transition: r .1s ease; }
+#trend-chart .series-point-conv:hover { r: 6.5; }
 #trend-chart .axis-label { fill: var(--ink-faint); font-size: 9px; font-family: ui-monospace, monospace; }
 .chart-legend { display: flex; gap: 16px; font-size: 11.5px; color: var(--ink-soft); margin-top: 10px; flex-wrap: wrap; }
 .chart-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
@@ -165,16 +163,6 @@ section.chart-card { margin-bottom: 32px; }
 .evo-row .evo-delta { font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 600; text-align: right; }
 .evo-row .evo-delta.up { color: var(--good); }
 .evo-row .evo-delta.down { color: var(--warn); }
-.heatmap-grid { display: flex; gap: 4px; flex-wrap: wrap; }
-.heatmap-cell {
-  width: 22px; height: 22px; border-radius: 4px; background: var(--surface-alt);
-  cursor: pointer; border: 1px solid var(--border); position: relative;
-}
-.heatmap-cell.today, .heatmap-cell.recent { border: 2px solid var(--accent-ink); }
-.heatmap-cell:hover { outline: 2px solid var(--accent); }
-.heatmap-legend { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-faint); margin-top: 10px; }
-.heatmap-legend .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-
 #day-detail { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 13px; display: none; }
 #day-detail.open { display: block; }
 #day-detail table { width: 100%; border-collapse: collapse; font-size: 12.5px; }

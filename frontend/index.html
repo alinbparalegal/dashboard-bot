@@ -32,33 +32,33 @@
           <div class="kpi-icon" style="background:var(--accent)">&#128172;</div>
           <div class="kpi-body">
             <span class="label">Conversación</span>
+            <span class="value" id="kpi-conversacion">—</span>
             <span class="sub">leads con tag de estado del bot</span>
           </div>
-          <span class="value" id="kpi-conversacion">—</span>
         </div>
         <div class="kpi">
           <div class="kpi-icon" style="background:var(--good)">&#10003;</div>
           <div class="kpi-body">
             <span class="label">Cualificado</span>
+            <span class="value" id="kpi-cualificado">—</span>
             <span class="sub" id="kpi-cualificado-sub">—</span>
           </div>
-          <span class="value" id="kpi-cualificado">—</span>
         </div>
         <div class="kpi accent">
           <div class="kpi-icon" style="background:var(--warn)">&#128197;</div>
           <div class="kpi-body">
             <span class="label">Cita</span>
+            <span class="value" id="kpi-cita">—</span>
             <span class="sub" id="kpi-cita-sub">—</span>
           </div>
-          <span class="value" id="kpi-cita">—</span>
         </div>
         <div class="kpi">
           <div class="kpi-icon" style="background:var(--cat4)">&euro;</div>
           <div class="kpi-body">
             <span class="label">Ingreso estimado</span>
+            <span class="value" id="kpi-ingreso">—</span>
             <span class="sub">según precio de asesoría · rango online–presencial</span>
           </div>
-          <span class="value" id="kpi-ingreso">—</span>
         </div>
       </div>
       <div class="citas-pane">
@@ -67,27 +67,16 @@
       </div>
     </section>
 
-    <section class="panels-grid">
-      <div class="heatmap-card">
-        <h2 id="heatmap-title">Leads tratados — últimos 30 días</h2>
-        <div class="heatmap-grid" id="heatmap-grid"></div>
-        <div class="heatmap-legend">
-          <span class="sw" style="background:var(--surface-alt);border:1px solid var(--border);"></span> menos
-          <span class="sw" style="background:var(--accent);"></span> más
-          &middot; borde marcado = hoy / ayer &middot; clic en un día para el detalle por marca
-        </div>
-        <div id="day-detail"></div>
+    <section class="chart-card">
+      <h2 id="trend-title">Leads tratados — tendencia · últimos 30 días</h2>
+      <div id="trend-chart"></div>
+      <div class="chart-legend">
+        <span><i style="background:var(--accent)"></i> Conversación &middot; el color de cada punto es la intensidad del día</span>
+        <span><i style="background:var(--good)"></i> Cualificado</span>
+        <span><i style="background:var(--warn)"></i> Cita</span>
       </div>
-
-      <div class="chart-card">
-        <h2 id="trend-title">Tendencia — últimos 30 días</h2>
-        <div id="trend-chart"></div>
-        <div class="chart-legend">
-          <span><i style="background:var(--accent)"></i> Conversación</span>
-          <span><i style="background:var(--good)"></i> Cualificado</span>
-          <span><i style="background:var(--warn)"></i> Cita</span>
-        </div>
-      </div>
+      <p class="detail-intro">Clic en un punto de conversación para ver el detalle de ese día por marca. Borde marcado = hoy / ayer.</p>
+      <div id="day-detail"></div>
     </section>
 
     <section class="compare-card">
