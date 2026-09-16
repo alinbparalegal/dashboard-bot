@@ -36,11 +36,6 @@ async function fetchJSON(url) {
   return res.json();
 }
 
-function sqrtScale(value, max) {
-  if (!max) return 0;
-  return Math.round((Math.sqrt(value) / Math.sqrt(max)) * 1000) / 10;
-}
-
 function renderKpis(total) {
   const e0 = total.conversacion, e1 = total.etapa1_cualificado, e2 = total.etapa2_cita;
   $('#kpi-conversacion').textContent = fmt(e0);
@@ -113,9 +108,13 @@ function renderBreakdownRows(entries, total, labelFn) {
     </div>`).join('');
 }
 
+// Icono + color por marca — solo para distinguir de un vistazo la fila compacta, sin relación
+// con los colores semánticos (verde=bien, ámbar=aviso) que ya usan otras partes del dashboard.
+const BRAND_ICON = { CYA: '&#9878;&#65039;', ETH: '&#127891;', ETV: '&#9992;&#65039;', NAC: '&#129411;', MNEE: '&#127970;' };
+const BRAND_COLOR = { CYA: 'var(--accent)', ETH: 'var(--cat4)', ETV: 'var(--cat5)', NAC: 'var(--cat6)', MNEE: 'var(--cat7)' };
+
 function renderBrandCard(b) {
   const e0 = b.conversacion, e1 = b.etapa1_cualificado, e2 = b.etapa2_cita;
-  const w1 = sqrtScale(e1, e0), w2 = sqrtScale(e2, e0);
   const r01 = e0 ? pct(e1 / e0 * 100) : '0,0';
   const r12 = e1 ? pct(e2 / e1 * 100) : '0,0';
   const overall = e0 ? pct(e2 / e0 * 100) : '0,0';
@@ -126,31 +125,29 @@ function renderBrandCard(b) {
   return `
   <article class="brand-card">
     <div class="brand-head">
+      <div class="bc-icon" style="background:${BRAND_COLOR[b.marca] || 'var(--accent)'}">${BRAND_ICON[b.marca] || ''}</div>
       <div class="name-block">
         <h2>${b.nombre}</h2>
         <span class="code">${b.marca}</span>
       </div>
-      <div class="overall">tasa global bot→cita <b>${overall} %</b> &middot; ingreso estimado <b>${b.ingreso_min === b.ingreso_max ? fmtEUR(b.ingreso_min) : `${fmtEUR(b.ingreso_min)}–${fmtEUR(b.ingreso_max)}`}</b></div>
     </div>
     <div class="funnel">
-      <div class="step step-total">
+      <div class="step">
         <span class="stage-label">Conversación</span>
         <span class="stage-count">${fmt(e0)}</span>
-        <div class="bar-spacer"></div>
       </div>
-      <div class="arrow-gap"><span class="rate">${r01} %</span></div>
       <div class="step">
         <span class="stage-label">Cualificado</span>
         <span class="stage-count">${fmt(e1)}</span>
-        <div class="bar-track"><div class="bar-fill" style="width:${w1}%"></div></div>
+        <span class="stage-rate">${r01} %</span>
       </div>
-      <div class="arrow-gap"><span class="rate">${r12} %</span></div>
       <div class="step">
         <span class="stage-label">Cita</span>
         <span class="stage-count">${fmt(e2)}</span>
-        <div class="bar-track"><div class="bar-fill" style="width:${w2}%"></div></div>
+        <span class="stage-rate">${r12} %</span>
       </div>
     </div>
+    <div class="overall">bot&rarr;cita <b>${overall} %</b> &middot; <b>${b.ingreso_min === b.ingreso_max ? fmtEUR(b.ingreso_min) : `${fmtEUR(b.ingreso_min)}–${fmtEUR(b.ingreso_max)}`}</b></div>
 
     <details class="brand-detail">
       <summary>Análisis detallado</summary>

@@ -236,26 +236,30 @@ section.chart-card { margin-bottom: 32px; }
 #day-detail thead th { color: var(--ink-faint); font-weight: 600; border-bottom: 1px solid var(--border); }
 #day-detail td { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-variant-numeric: tabular-nums; }
 
-/* Brand cards */
-.brands { display: flex; flex-direction: column; gap: 16px; }
-.brand-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; box-shadow: var(--shadow); }
-.brand-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-  border-bottom: 2px solid var(--accent); padding-bottom: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-.brand-head .name-block { display: flex; align-items: baseline; gap: 8px; }
-.brand-head h2 { font-size: 18px; }
-.brand-head .code { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); background: var(--surface-alt); padding: 2px 6px; border-radius: 4px; }
-.brand-head .overall { font-size: 12.5px; color: var(--ink-soft); }
-.brand-head .overall b { font-family: ui-monospace, monospace; color: var(--accent-ink); }
+/* Brand cards: una fila compacta con las 5 marcas, cada una con su icono y el "Análisis
+   detallado" plegado debajo (se abre solo esa tarjeta, sin descuadrar las demás). */
+.brands { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: start; }
+@media (max-width: 1100px) { .brands { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px) { .brands { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 460px) { .brands { grid-template-columns: 1fr; } }
 
-.funnel { display: flex; align-items: flex-end; gap: 0; }
-.step { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.brand-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
+.brand-head { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--separator-inset); }
+.bc-icon { width: 30px; height: 30px; border-radius: 8px; flex: 0 0 auto; display: flex; align-items: center;
+  justify-content: center; color: #fff; font-size: 14px; }
+.brand-head .name-block { min-width: 0; }
+.brand-head h2 { font-size: 13.5px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-head .code { font-family: ui-monospace, monospace; font-size: 10px; color: var(--ink-faint); }
+.overall { font-size: 11px; color: var(--ink-soft); margin-top: 10px; }
+.overall b { font-family: ui-monospace, monospace; color: var(--accent-ink); }
+
+.funnel { display: flex; flex-direction: column; gap: 8px; }
+.step { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
 .step .stage-label { font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.03em; }
-.step .stage-count { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 19px; font-weight: 600; }
+.step .stage-count { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 700; margin-left: auto; }
+.step .stage-rate { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 10.5px; color: var(--ink-faint); }
 .bar-track { height: 9px; background: var(--surface-alt); border-radius: 3px; overflow: hidden; }
-.bar-spacer { height: 9px; }
 .bar-fill { height: 100%; background: var(--accent); border-radius: 3px; min-width: 3px; }
-.arrow-gap { flex: 0 0 auto; width: 60px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 18px; }
-.arrow-gap .rate { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
 
 /* Análisis detallado por marca */
 .brand-detail { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
@@ -264,8 +268,7 @@ section.chart-card { margin-bottom: 32px; }
 .brand-detail summary::before { content: "▸ "; }
 .brand-detail[open] summary::before { content: "▾ "; }
 .detail-intro { font-size: 11.5px; color: var(--ink-faint); margin: 8px 0 0; font-style: italic; }
-.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 12px; }
-@media (max-width: 520px) { .detail-grid { grid-template-columns: 1fr; } }
+.detail-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 12px; }
 .detail-col h3 { font-family: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-faint); font-weight: 600; margin-bottom: 8px; }
 .detail-col h3 .detail-total { font-family: ui-monospace, monospace; color: var(--ink-soft); text-transform: none; letter-spacing: normal; }
 .breakdown-row { display: grid; grid-template-columns: 1fr 70px 34px 44px; align-items: center; gap: 8px; padding: 3px 0; font-size: 11.5px; }
