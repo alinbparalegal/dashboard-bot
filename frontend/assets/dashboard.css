@@ -237,8 +237,7 @@ section.chart-card { margin-bottom: 32px; }
 #day-detail td { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-variant-numeric: tabular-nums; }
 
 /* Brand cards */
-.brands { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 860px) { .brands { grid-template-columns: 1fr; } }
+.brands { display: flex; flex-direction: column; gap: 16px; }
 .brand-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; box-shadow: var(--shadow); }
 .brand-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
   border-bottom: 2px solid var(--accent); padding-bottom: 8px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -253,6 +252,7 @@ section.chart-card { margin-bottom: 32px; }
 .step .stage-label { font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.03em; }
 .step .stage-count { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 19px; font-weight: 600; }
 .bar-track { height: 9px; background: var(--surface-alt); border-radius: 3px; overflow: hidden; }
+.bar-spacer { height: 9px; }
 .bar-fill { height: 100%; background: var(--accent); border-radius: 3px; min-width: 3px; }
 .arrow-gap { flex: 0 0 auto; width: 60px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 18px; }
 .arrow-gap .rate { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600; color: var(--ink-soft); }

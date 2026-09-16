@@ -133,10 +133,10 @@ function renderBrandCard(b) {
       <div class="overall">tasa global bot→cita <b>${overall} %</b> &middot; ingreso estimado <b>${b.ingreso_min === b.ingreso_max ? fmtEUR(b.ingreso_min) : `${fmtEUR(b.ingreso_min)}–${fmtEUR(b.ingreso_max)}`}</b></div>
     </div>
     <div class="funnel">
-      <div class="step">
+      <div class="step step-total">
         <span class="stage-label">Conversación</span>
         <span class="stage-count">${fmt(e0)}</span>
-        <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+        <div class="bar-spacer"></div>
       </div>
       <div class="arrow-gap"><span class="rate">${r01} %</span></div>
       <div class="step">
