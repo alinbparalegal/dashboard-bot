@@ -16,6 +16,7 @@
   --cat5: #b0577a;
   --cat6: #4d7ea8;
   --cat7: #8a6a35;
+  --separator-inset: #eee9dd;
   --shadow: 0 1px 2px rgba(32,38,31,0.04), 0 6px 20px rgba(32,38,31,0.05);
   color-scheme: light;
 }
@@ -25,6 +26,7 @@
     --ink-soft: #a3b2ac; --ink-faint: #71827c; --border: #2b3a3b; --accent: #5fb6ae;
     --accent-ink: #bfe7e2; --accent-soft: #1d3735; --good: #74cf8f; --warn: #e2ac60;
     --warn-soft: #3a2f1c; --cat4: #9b9ce0; --cat5: #e08aab; --cat6: #7fa8d6; --cat7: #c9a35f;
+    --separator-inset: #223132;
     --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
     color-scheme: dark;
   }
@@ -55,38 +57,58 @@ h1.title { font-size: 28px; font-weight: 600; }
 .subtitle { color: var(--ink-soft); font-size: 14px; }
 .meta-row { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 8px; font-size: 12.5px; color: var(--ink-faint); }
 
-.period-tabs { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
-.period-tab {
-  background: var(--surface); color: var(--ink-soft); border: 1px solid var(--border);
-  border-radius: 999px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+/* Control segmentado (estilo iOS) para las pestañas de periodo */
+.period-tabs {
+  display: inline-flex; gap: 2px; margin-top: 14px; max-width: 100%; overflow-x: auto;
+  background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px; padding: 3px;
 }
-.period-tab:hover { border-color: var(--accent); }
-.period-tab.active { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.period-tab {
+  background: transparent; color: var(--ink-soft); border: none;
+  border-radius: 7px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.period-tab:hover { color: var(--ink); }
+.period-tab.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
 .period-tab:disabled { opacity: 0.5; cursor: default; }
+
+/* Encabezado pequeño en mayúsculas para el interior de una caja agrupada (estilo iOS) */
+.grouped-header { font-size: 11.5px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase;
+  letter-spacing: 0.05em; padding: 14px 20px 8px; }
+.citas-pane .grouped-header { padding: 0 0 12px; }
 
 /* KPIs (verticales, 30%, unidos en una sola caja) + últimas citas (70%) */
 .kpi-citas-split { display: grid; grid-template-columns: 3fr 7fr; gap: 16px; margin-bottom: 32px; align-items: stretch; }
-.kpis-pane { display: flex; flex-direction: column; background: var(--border); gap: 1px;
-  border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
-.kpi { background: var(--surface); padding: 16px 20px; display: flex; flex-direction: column; gap: 4px; }
-.kpi .label { font-size: 11.5px; color: var(--ink-faint); }
-.kpi .value { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 600; }
-.kpi .sub { font-size: 11.5px; color: var(--ink-soft); }
+.kpis-pane { display: flex; flex-direction: column; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+.kpi { padding: 13px 20px; display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--separator-inset); }
+.kpi:first-of-type { border-top: none; }
+.kpi-icon { width: 30px; height: 30px; border-radius: 8px; flex: 0 0 auto; display: flex; align-items: center;
+  justify-content: center; color: #fff; font-size: 14px; }
+.kpi-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.kpi .label { font-size: 14px; font-weight: 600; color: var(--ink); }
+.kpi .value { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 19px; font-weight: 700; flex: 0 0 auto; }
+.kpi .sub { font-size: 11.5px; color: var(--ink-faint); }
 .kpi.accent .value { color: var(--accent-ink); }
-.citas-pane { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 18px 20px; min-width: 0; }
-.citas-pane h2 { font-size: 16px; margin-bottom: 12px; }
+.citas-pane { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 18px 20px; min-width: 0; }
 @media (max-width: 760px) { .kpi-citas-split { grid-template-columns: 1fr; gap: 16px; } }
+
+/* Avatar de iniciales + insignias de estado (citas) */
+.avatar { width: 32px; height: 32px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center;
+  justify-content: center; color: #fff; font-size: 12.5px; font-weight: 700; text-transform: uppercase; }
+.badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; display: inline-flex;
+  align-items: center; gap: 3px; white-space: nowrap; }
+.badge.ok { background: var(--accent-soft); color: var(--accent-ink); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
 
 /* Panel de dos columnas: heatmap + tendencia */
 .panels-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; align-items: start; }
 @media (max-width: 860px) { .panels-grid { grid-template-columns: 1fr; } }
 
 /* Heatmap */
-.heatmap-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow); }
+.heatmap-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
 .heatmap-card h2 { font-size: 16px; margin-bottom: 12px; }
 
 /* Gráfica de tendencia */
-.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow); }
+.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); }
 .chart-card h2 { font-size: 16px; margin-bottom: 12px; }
 section.chart-card { margin-bottom: 32px; }
 #trend-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
@@ -113,7 +135,7 @@ section.chart-card { margin-bottom: 32px; }
    entre marcas, a la izquierda) y evolución vs. mes anterior (a la derecha). Dos preguntas
    distintas ("¿quién tiene más actividad?" vs. "¿quién está creciendo?"), así que se separan
    en vez de mezclar dos escalas en el mismo gráfico (fue justo lo que confundía antes). */
-.compare-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 32px; box-shadow: var(--shadow); overflow: hidden; }
+.compare-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 32px; box-shadow: var(--shadow); overflow: hidden; }
 .compare-split { display: grid; grid-template-columns: 60% 1px 40%; }
 .compare-pane { padding: 18px 20px; min-width: 0; }
 .compare-pane h3 { font-size: 14.5px; margin-bottom: 2px; }
@@ -164,7 +186,7 @@ section.chart-card { margin-bottom: 32px; }
 /* Brand cards */
 .brands { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 860px) { .brands { grid-template-columns: 1fr; } }
-.brand-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 22px; box-shadow: var(--shadow); }
+.brand-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; box-shadow: var(--shadow); }
 .brand-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
   border-bottom: 2px solid var(--accent); padding-bottom: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 .brand-head .name-block { display: flex; align-items: baseline; gap: 8px; }
@@ -203,7 +225,7 @@ section.chart-card { margin-bottom: 32px; }
 .detail-extra b { font-family: ui-monospace, monospace; color: var(--ink); }
 
 /* Timeline de citas */
-.timeline-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 32px; box-shadow: var(--shadow); }
+.timeline-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin-bottom: 32px; box-shadow: var(--shadow); }
 .timeline-card h2 { font-size: 16px; }
 .timeline-card .header-top { margin-bottom: 0; align-items: baseline; }
 .tl-computed { font-size: 11px; color: var(--ink-faint); font-style: italic; white-space: nowrap; }
@@ -211,25 +233,22 @@ section.chart-card { margin-bottom: 32px; }
 .timeline-brand h3 { font-size: 13px; margin-bottom: 8px; display: flex; align-items: baseline; gap: 8px; }
 .timeline-brand h3 .tl-count { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); font-weight: 400; }
 .tl-resumen-gestion { font-size: 11px; color: var(--ink-soft); margin: -2px 0 6px; }
-.timeline-row { display: grid; grid-template-columns: 110px 1fr 70px auto; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.timeline-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--separator-inset); font-size: 12.5px; }
 .timeline-row:last-child { border-bottom: none; }
-.timeline-row .tl-fecha { font-family: ui-monospace, monospace; color: var(--ink-soft); white-space: nowrap; }
-.timeline-row .tl-nombre { text-transform: capitalize; }
-.timeline-row .tl-gestion { font-size: 10.5px; color: var(--ink-faint); text-transform: capitalize; }
-.timeline-row .tl-unverified { font-size: 10.5px; color: var(--warn); font-style: italic; }
-.timeline-row .tl-status { font-size: 10px; text-transform: uppercase; color: var(--ink-faint); font-family: ui-monospace, monospace; }
-@media (max-width: 560px) { .timeline-row { grid-template-columns: 1fr; } }
+.tl-body { flex: 1 1 auto; min-width: 0; }
+.timeline-row .tl-nombre { font-weight: 700; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-row .tl-gestion { font-size: 11px; color: var(--ink-faint); text-transform: capitalize; }
+.tl-trailing { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.timeline-row .tl-fecha { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
 
 /* Últimas 10 citas (dentro de .citas-pane, ver kpi-citas-split) */
-.lc-row { display: grid; grid-template-columns: 110px 50px 1fr 90px auto; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+.lc-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--separator-inset); font-size: 12.5px; }
 .lc-row:last-child { border-bottom: none; }
-.lc-row .lc-fecha { font-family: ui-monospace, monospace; color: var(--ink-soft); white-space: nowrap; }
-.lc-row .lc-marca { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); background: var(--surface-alt); padding: 2px 6px; border-radius: 4px; text-align: center; }
-.lc-row .lc-nombre { text-transform: capitalize; }
-.lc-row .lc-gestion { font-size: 10.5px; color: var(--ink-faint); text-transform: capitalize; }
-.lc-row .lc-status { font-size: 10px; text-transform: uppercase; color: var(--ink-faint); font-family: ui-monospace, monospace; text-align: right; }
-.lc-row .lc-unverified { color: var(--warn); }
-@media (max-width: 640px) { .lc-row { grid-template-columns: 1fr; } }
+.lc-body { flex: 1 1 auto; min-width: 0; }
+.lc-row .lc-nombre { font-weight: 700; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lc-row .lc-meta { font-size: 11px; color: var(--ink-faint); }
+.lc-trailing { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.lc-row .lc-fecha { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); white-space: nowrap; }
 
 /* Tabla de rendimiento por campaña */
 .campana-row { display: grid; grid-template-columns: 1fr 55px 55px 45px 55px; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px; }

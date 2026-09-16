@@ -27,29 +27,42 @@
 
     <section class="kpi-citas-split">
       <div class="kpis-pane" aria-label="Totales agregados">
+        <div class="grouped-header">Totales agregados</div>
         <div class="kpi">
-          <span class="label">Conversación</span>
+          <div class="kpi-icon" style="background:var(--accent)">&#128172;</div>
+          <div class="kpi-body">
+            <span class="label">Conversación</span>
+            <span class="sub">leads con tag de estado del bot</span>
+          </div>
           <span class="value" id="kpi-conversacion">—</span>
-          <span class="sub">leads con tag de estado del bot</span>
         </div>
         <div class="kpi">
-          <span class="label">Cualificado</span>
+          <div class="kpi-icon" style="background:var(--good)">&#10003;</div>
+          <div class="kpi-body">
+            <span class="label">Cualificado</span>
+            <span class="sub" id="kpi-cualificado-sub">—</span>
+          </div>
           <span class="value" id="kpi-cualificado">—</span>
-          <span class="sub" id="kpi-cualificado-sub">—</span>
         </div>
         <div class="kpi accent">
-          <span class="label">Cita</span>
+          <div class="kpi-icon" style="background:var(--warn)">&#128197;</div>
+          <div class="kpi-body">
+            <span class="label">Cita</span>
+            <span class="sub" id="kpi-cita-sub">—</span>
+          </div>
           <span class="value" id="kpi-cita">—</span>
-          <span class="sub" id="kpi-cita-sub">—</span>
         </div>
         <div class="kpi">
-          <span class="label">Ingreso estimado</span>
+          <div class="kpi-icon" style="background:var(--cat4)">&euro;</div>
+          <div class="kpi-body">
+            <span class="label">Ingreso estimado</span>
+            <span class="sub">según precio de asesoría · rango online–presencial</span>
+          </div>
           <span class="value" id="kpi-ingreso">—</span>
-          <span class="sub">según precio de asesoría · rango online–presencial</span>
         </div>
       </div>
       <div class="citas-pane">
-        <h2>Últimas 10 citas</h2>
+        <div class="grouped-header">Últimas 10 citas</div>
         <div id="ultimas-citas"><div class="loading">Cargando…</div></div>
       </div>
     </section>

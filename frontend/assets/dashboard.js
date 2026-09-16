@@ -452,6 +452,27 @@ function fmtFecha(iso) {
   return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+// Iniciales + color de avatar (determinista por nombre) para las filas de citas.
+const AVATAR_COLORS = ['var(--accent)', 'var(--good)', 'var(--cat4)', 'var(--cat5)', 'var(--cat6)', 'var(--warn)'];
+function iniciales(nombre) {
+  const partes = (nombre || '').trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return '?';
+  return (partes[0][0] + (partes[1]?.[0] || '')).toUpperCase();
+}
+function colorAvatar(nombre) {
+  let hash = 0;
+  for (const ch of nombre || '') hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+// Insignia de estado de una cita: fiable (BOT + pago info + fecha de pago) es la confirmación
+// fuerte; si no, se dice cuál de las tres condiciones falta en vez de un "no verificada" genérico.
+function badgeCita(c) {
+  if (c.fiable) return '<span class="badge ok">&#10003; verificada</span>';
+  if (!c.esBot) return '<span class="badge warn">gestión humana</span>';
+  if (!c.verificado) return '<span class="badge warn">sin pago info</span>';
+  return '<span class="badge warn">sin fecha de pago</span>';
+}
+
 function renderTimeline(marcas, computedAt) {
   $('#timeline-computed-at').textContent = computedAt ? `Calculado a las ${fmtHora(computedAt)}` : '';
   const html = marcas.map(m => {
@@ -466,12 +487,15 @@ function renderTimeline(marcas, computedAt) {
     ].filter(Boolean).join(' · ');
     const rows = m.citas.map(c => `
       <div class="timeline-row">
-        <span class="tl-fecha">${fmtFecha(c.fecha)}</span>
-        <span class="tl-nombre">${c.nombre}</span>
-        <span class="tl-gestion">${c.esBot ? 'bot' : (c.gestionadoPor || '—')}</span>
-        <span class="tl-status">${c.verificado
-          ? 'pago/cita confirmado'
-          : '<span class="tl-unverified">sin confirmación de pago registrada</span>'}</span>
+        <div class="avatar" style="background:${colorAvatar(c.nombre)}">${iniciales(c.nombre)}</div>
+        <div class="tl-body">
+          <div class="tl-nombre">${c.nombre}</div>
+          <div class="tl-gestion">${c.esBot ? 'gestionada por el bot' : `gestionada por ${c.gestionadoPor || 'humano'}`}</div>
+        </div>
+        <div class="tl-trailing">
+          <span class="tl-fecha">${fmtFecha(c.fecha)}</span>
+          ${badgeCita(c)}
+        </div>
       </div>`).join('');
     return `
       <div class="timeline-brand">
@@ -495,11 +519,15 @@ function renderUltimasCitas(marcas) {
 
   $('#ultimas-citas').innerHTML = ultimas.map(c => `
     <div class="lc-row">
-      <span class="lc-fecha">${fmtFecha(c.fecha)}</span>
-      <span class="lc-marca">${c.marca}</span>
-      <span class="lc-nombre">${c.nombre}</span>
-      <span class="lc-gestion">${c.esBot ? 'bot' : (c.gestionadoPor || '—')}</span>
-      <span class="lc-status">${c.verificado ? 'confirmado' : '<span class="lc-unverified">sin confirmar</span>'}</span>
+      <div class="avatar" style="background:${colorAvatar(c.nombre)}">${iniciales(c.nombre)}</div>
+      <div class="lc-body">
+        <div class="lc-nombre">${c.nombre}</div>
+        <div class="lc-meta">${c.marca} &middot; ${c.esBot ? 'gestionada por el bot' : `gestionada por ${c.gestionadoPor || 'humano'}`}</div>
+      </div>
+      <div class="lc-trailing">
+        <span class="lc-fecha">${fmtFecha(c.fecha)}</span>
+        ${badgeCita(c)}
+      </div>
     </div>`).join('');
 }
 
