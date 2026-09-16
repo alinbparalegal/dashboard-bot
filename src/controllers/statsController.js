@@ -23,13 +23,14 @@ function dateRangeArray(desdeStr, hastaStr) {
 }
 
 async function runBackfillCitasFiables(req, res) {
-  const { desde, hasta } = req.query;
+  const { desde, hasta, marca } = req.query;
   if (!desde || !hasta) return res.status(400).json({ message: 'Faltan desde/hasta' });
   const fechas = dateRangeArray(desde, hasta);
   const resultado = [];
   for (const fecha of fechas) {
     try {
-      await statsService.upsertDailyStatsAllBrands(fecha);
+      if (marca) await statsService.upsertDailyStats(marca, fecha);
+      else await statsService.upsertDailyStatsAllBrands(fecha);
       resultado.push({ fecha, ok: true });
     } catch (e) {
       resultado.push({ fecha, ok: false, error: e.message });
