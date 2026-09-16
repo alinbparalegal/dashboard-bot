@@ -176,8 +176,8 @@ section.chart-card { margin-bottom: 32px; }
 #trend-chart .grid-line { stroke: var(--border); stroke-width: 1; }
 #trend-chart .series-line { fill: none; stroke-width: 2; }
 #trend-chart .series-point { fill: var(--surface); stroke-width: 1.6; }
-#trend-chart .series-point-conv { cursor: pointer; transition: r .1s ease; }
-#trend-chart .series-point-conv:hover { r: 6.5; }
+#trend-chart .series-bar-conv { cursor: pointer; transition: opacity .1s ease; }
+#trend-chart .series-bar-conv:hover { opacity: 0.75; }
 #trend-chart .axis-label { fill: var(--ink-faint); font-size: 9px; font-family: ui-monospace, monospace; }
 .chart-legend { display: flex; gap: 16px; font-size: 11.5px; color: var(--ink-soft); margin-top: 10px; flex-wrap: wrap; }
 .chart-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
@@ -236,14 +236,18 @@ section.chart-card { margin-bottom: 32px; }
 #day-detail thead th { color: var(--ink-faint); font-weight: 600; border-bottom: 1px solid var(--border); }
 #day-detail td { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-variant-numeric: tabular-nums; }
 
-/* Brand cards: una fila compacta con las 5 marcas, cada una con su icono y el "Análisis
-   detallado" plegado debajo (se abre solo esa tarjeta, sin descuadrar las demás). */
-.brands { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: start; }
-@media (max-width: 1100px) { .brands { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 700px) { .brands { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 460px) { .brands { grid-template-columns: 1fr; } }
+/* Brand cards: las 5 marcas comparten UNA sola caja (como kpis-pane), en columnas separadas
+   por una línea fina. El "Análisis detallado" no vive dentro de la columna estrecha — abre un
+   panel a todo el ancho de la caja, debajo de la fila, para que cite/leyes de leads no queden
+   apretadas en 1/5 del ancho. */
+.brands-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 32px; }
+.brands-row { display: grid; grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 1100px) { .brands-row { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px) { .brands-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 460px) { .brands-row { grid-template-columns: 1fr; } }
 
-.brand-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
+.brand-col { padding: 14px 16px; border-left: 1px solid var(--separator-inset); }
+.brand-col:first-child { border-left: none; }
 .brand-head { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--separator-inset); }
 .bc-icon { width: 30px; height: 30px; border-radius: 8px; flex: 0 0 auto; display: flex; align-items: center;
   justify-content: center; color: #fff; font-size: 14px; }
@@ -261,14 +265,25 @@ section.chart-card { margin-bottom: 32px; }
 .bar-track { height: 9px; background: var(--surface-alt); border-radius: 3px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--accent); border-radius: 3px; min-width: 3px; }
 
-/* Análisis detallado por marca */
-.brand-detail { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
-.brand-detail summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--accent-ink); list-style: none; }
-.brand-detail summary::-webkit-details-marker { display: none; }
-.brand-detail summary::before { content: "▸ "; }
-.brand-detail[open] summary::before { content: "▾ "; }
+.brand-detail-toggle {
+  appearance: none; border: none; background: none; padding: 0; margin-top: 10px;
+  font: inherit; font-size: 11.5px; font-weight: 600; color: var(--accent-ink); cursor: pointer;
+}
+.brand-detail-toggle::before { content: "▸ "; }
+.brand-detail-toggle:hover { text-decoration: underline; }
+
+/* Análisis detallado — panel a todo el ancho, debajo de la fila de marcas */
+.brand-detail-full { border-top: 1px solid var(--border); padding: 16px 20px; }
+.brand-detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.brand-detail-head h3 { font-size: 14px; flex: 1 1 auto; }
+.brand-detail-close {
+  appearance: none; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft);
+  border-radius: 999px; width: 24px; height: 24px; font-size: 15px; line-height: 1; cursor: pointer;
+}
+.brand-detail-close:hover { border-color: var(--accent); color: var(--ink); }
 .detail-intro { font-size: 11.5px; color: var(--ink-faint); margin: 8px 0 0; font-style: italic; }
-.detail-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 12px; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 12px; }
+@media (max-width: 640px) { .detail-grid { grid-template-columns: 1fr; } }
 .detail-col h3 { font-family: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-faint); font-weight: 600; margin-bottom: 8px; }
 .detail-col h3 .detail-total { font-family: ui-monospace, monospace; color: var(--ink-soft); text-transform: none; letter-spacing: normal; }
 .breakdown-row { display: grid; grid-template-columns: 1fr 70px 34px 44px; align-items: center; gap: 8px; padding: 3px 0; font-size: 11.5px; }

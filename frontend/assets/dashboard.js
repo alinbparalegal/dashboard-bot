@@ -113,17 +113,17 @@ function renderBreakdownRows(entries, total, labelFn) {
 const BRAND_ICON = { CYA: '&#9878;&#65039;', ETH: '&#127891;', ETV: '&#9992;&#65039;', NAC: '&#129411;', MNEE: '&#127970;' };
 const BRAND_COLOR = { CYA: 'var(--accent)', ETH: 'var(--cat4)', ETV: 'var(--cat5)', NAC: 'var(--cat6)', MNEE: 'var(--cat7)' };
 
-function renderBrandCard(b) {
+// Columna compacta de una marca (icono + funnel + tasa global) dentro de la fila compartida
+// brands-row. El botón de abajo no es un <details> propio — abre el panel brand-detail-full,
+// que ocupa todo el ancho de la caja en vez de quedar aplastado en una columna de 1/5.
+function renderBrandColumn(b) {
   const e0 = b.conversacion, e1 = b.etapa1_cualificado, e2 = b.etapa2_cita;
   const r01 = e0 ? pct(e1 / e0 * 100) : '0,0';
   const r12 = e1 ? pct(e2 / e1 * 100) : '0,0';
   const overall = e0 ? pct(e2 / e0 * 100) : '0,0';
 
-  const motivos = topEntries(b.motivos_descarte);
-  const tramites = topEntries(b.tramites_potencial);
-
   return `
-  <article class="brand-card">
+  <article class="brand-col" data-marca="${b.marca}">
     <div class="brand-head">
       <div class="bc-icon" style="background:${BRAND_COLOR[b.marca] || 'var(--accent)'}">${BRAND_ICON[b.marca] || ''}</div>
       <div class="name-block">
@@ -148,23 +148,56 @@ function renderBrandCard(b) {
       </div>
     </div>
     <div class="overall">bot&rarr;cita <b>${overall} %</b> &middot; <b>${b.ingreso_min === b.ingreso_max ? fmtEUR(b.ingreso_min) : `${fmtEUR(b.ingreso_min)}–${fmtEUR(b.ingreso_max)}`}</b></div>
-
-    <details class="brand-detail">
-      <summary>Análisis detallado</summary>
-      <p class="detail-intro">De los leads que calificaron, en qué trámite están interesados — y de los que se descartaron, por qué motivo.</p>
-      <div class="detail-grid">
-        <div class="detail-col">
-          <h3>¿Qué trámite quieren? <span class="detail-total">${fmt(b.lead_potencial)} leads</span></h3>
-          ${tramites.length ? renderBreakdownRows(tramites, b.lead_potencial, labelTramite) : '<p class="bd-empty">Sin datos</p>'}
-        </div>
-        <div class="detail-col">
-          <h3>¿Por qué se descartaron? <span class="detail-total">${fmt(b.lead_no_potencial)} leads</span></h3>
-          ${motivos.length ? renderBreakdownRows(motivos, b.lead_no_potencial, labelMotivo) : '<p class="bd-empty">Sin datos</p>'}
-        </div>
-      </div>
-      <div class="detail-extra">De ellos, llegaron por un anuncio de Meta (Facebook/Instagram Ads): <b>${fmt(b.meta_ads_potencial)}</b> leads cualificados</div>
-    </details>
+    <button type="button" class="brand-detail-toggle" data-marca="${b.marca}">Análisis detallado</button>
   </article>`;
+}
+
+function renderBrandDetailContent(b) {
+  const motivos = topEntries(b.motivos_descarte);
+  const tramites = topEntries(b.tramites_potencial);
+  return `
+    <div class="brand-detail-head">
+      <div class="bc-icon" style="background:${BRAND_COLOR[b.marca] || 'var(--accent)'}">${BRAND_ICON[b.marca] || ''}</div>
+      <h3>Análisis detallado &mdash; ${b.nombre}</h3>
+      <button type="button" class="brand-detail-close" aria-label="Cerrar">&times;</button>
+    </div>
+    <p class="detail-intro">De los leads que calificaron, en qué trámite están interesados — y de los que se descartaron, por qué motivo.</p>
+    <div class="detail-grid">
+      <div class="detail-col">
+        <h3>¿Qué trámite quieren? <span class="detail-total">${fmt(b.lead_potencial)} leads</span></h3>
+        ${tramites.length ? renderBreakdownRows(tramites, b.lead_potencial, labelTramite) : '<p class="bd-empty">Sin datos</p>'}
+      </div>
+      <div class="detail-col">
+        <h3>¿Por qué se descartaron? <span class="detail-total">${fmt(b.lead_no_potencial)} leads</span></h3>
+        ${motivos.length ? renderBreakdownRows(motivos, b.lead_no_potencial, labelMotivo) : '<p class="bd-empty">Sin datos</p>'}
+      </div>
+    </div>
+    <div class="detail-extra">De ellos, llegaron por un anuncio de Meta (Facebook/Instagram Ads): <b>${fmt(b.meta_ads_potencial)}</b> leads cualificados</div>`;
+}
+
+// Marcas de la última carga, para poder abrir su detalle sin volver a pedir nada.
+let brandsPorCodigo = {};
+
+function renderBrands(marcas) {
+  brandsPorCodigo = Object.fromEntries(marcas.map(b => [b.marca, b]));
+  $('#brands').innerHTML = marcas.map(renderBrandColumn).join('');
+  $('#brand-detail-full').hidden = true;
+  $('#brands').querySelectorAll('.brand-detail-toggle').forEach(btn => {
+    btn.addEventListener('click', () => openBrandDetail(btn.dataset.marca));
+  });
+}
+
+function openBrandDetail(marca) {
+  const panel = $('#brand-detail-full');
+  const b = brandsPorCodigo[marca];
+  if (!b) return;
+  const yaAbierto = !panel.hidden && panel.dataset.marca === marca;
+  if (yaAbierto) { panel.hidden = true; return; }
+  panel.dataset.marca = marca;
+  panel.innerHTML = renderBrandDetailContent(b);
+  panel.hidden = false;
+  panel.querySelector('.brand-detail-close')?.addEventListener('click', () => { panel.hidden = true; });
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // Evolución de cada marca frente al mismo punto del mes anterior: barra divergente centrada
@@ -231,7 +264,9 @@ function buildTrendSvg(daily) {
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const maxV = Math.max(...daily.map(d => d.conversacion), 1);
   const n = daily.length;
-  const x = i => padL + (n === 1 ? 0 : (i / (n - 1)) * innerW);
+  const slot = n === 1 ? innerW : innerW / n;
+  const barW = Math.max(1.5, slot * 0.62);
+  const x = i => padL + (n === 1 ? innerW / 2 : slot * (i + 0.5));
   const y = v => padT + innerH - (v / maxV) * innerH;
   const today = toDateStr(new Date());
   const yesterday = toDateStr(new Date(Date.now() - 86400000));
@@ -242,13 +277,19 @@ function buildTrendSvg(daily) {
   function pointsFor(key, color) {
     return daily.map((d, i) => `<circle class="series-point" cx="${x(i).toFixed(1)}" cy="${y(d[key]).toFixed(1)}" r="2.2" stroke="${color}"><title>${d.fecha}: ${fmt(d[key])}</title></circle>`).join('');
   }
-  function conversacionPoints(color) {
+  // "Leads tratados" en barras (antes puntos de línea): la altura marca la conversación del
+  // día y el color su intensidad relativa al máximo del periodo (mismo criterio que tenía el
+  // heatmap al que sustituyen) — y una barra es un blanco mucho más fácil de pinchar que un
+  // punto de 5px, sobre todo con muchos días apretados en el mismo ancho.
+  function conversacionBars(color) {
     return daily.map((d, i) => {
       const marcado = d.fecha === today || d.fecha === yesterday;
-      return `<circle class="series-point-conv" data-fecha="${d.fecha}" cx="${x(i).toFixed(1)}" cy="${y(d.conversacion).toFixed(1)}"
-        r="5" fill="${colorForIntensity(d.conversacion, maxV)}" stroke="${marcado ? color : 'transparent'}" stroke-width="1.6">
+      const barY = y(d.conversacion);
+      return `<rect class="series-bar-conv" data-fecha="${d.fecha}" x="${(x(i) - barW / 2).toFixed(1)}" y="${barY.toFixed(1)}"
+        width="${barW.toFixed(1)}" height="${Math.max(0, padT + innerH - barY).toFixed(1)}" rx="2"
+        fill="${colorForIntensity(d.conversacion, maxV)}" stroke="${marcado ? color : 'transparent'}" stroke-width="1.4">
         <title>${d.fecha}: ${fmt(d.conversacion)} — clic para el detalle</title>
-      </circle>`;
+      </rect>`;
     }).join('');
   }
 
@@ -264,12 +305,11 @@ function buildTrendSvg(daily) {
   return `
   <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
     ${gridLines}
-    <path class="series-line" d="${pathFor('conversacion')}" stroke="${accent}" />
+    ${conversacionBars(accent)}
     <path class="series-line" d="${pathFor('cualificado')}" stroke="${good}" />
     <path class="series-line" d="${pathFor('cita')}" stroke="${warn}" />
     ${pointsFor('cualificado', good)}
     ${pointsFor('cita', warn)}
-    ${conversacionPoints(accent)}
     <text class="axis-label" x="${padL}" y="${H - 4}">${firstLabel}</text>
     <text class="axis-label" x="${W - padR}" y="${H - 4}" text-anchor="end">${lastLabel}</text>
   </svg>`;
@@ -409,8 +449,8 @@ function colorForIntensity(v, max) {
 
 function renderHeatmapAndTrend(daily) {
   $('#trend-chart').innerHTML = buildTrendSvg(daily);
-  $('#trend-chart').querySelectorAll('.series-point-conv').forEach(point => {
-    point.addEventListener('click', () => showDayDetail(point.dataset.fecha));
+  $('#trend-chart').querySelectorAll('.series-bar-conv').forEach(bar => {
+    bar.addEventListener('click', () => showDayDetail(bar.dataset.fecha));
   });
 }
 
@@ -638,7 +678,7 @@ async function loadSummaryPiece(force) {
     if (periodKey() !== key) return summary;
     renderKpis(summary.total);
     renderCitasDonut(summary.marcas);
-    $('#brands').innerHTML = summary.marcas.map(renderBrandCard).join('');
+    renderBrands(summary.marcas);
     renderBrandVolume(summary.marcas);
     renderBrandCompare(summary.comparativaMensual);
     $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
@@ -820,7 +860,7 @@ function renderBundle(bundle) {
   if (summary) {
     renderKpis(summary.total);
     renderCitasDonut(summary.marcas);
-    $('#brands').innerHTML = summary.marcas.map(renderBrandCard).join('');
+    renderBrands(summary.marcas);
     renderBrandVolume(summary.marcas);
     renderBrandCompare(summary.comparativaMensual);
     $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
@@ -844,6 +884,7 @@ function renderPlaceholder() {
   ['#brands', '#donut-citas', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas', '#brand-volume', '#brand-compare']
     .forEach(sel => { $(sel).innerHTML = msg; });
   $('#trend-chart').innerHTML = '';
+  $('#brand-detail-full').hidden = true;
   $('#kpi-conversacion').textContent = '—';
   $('#kpi-cualificado').textContent = '—';
   $('#kpi-cita').textContent = '—';
