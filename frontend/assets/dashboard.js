@@ -2,12 +2,14 @@ const $ = sel => document.querySelector(sel);
 
 // Periodo seleccionado en las pestañas (Todo/Junio/Julio/...). null = por defecto (desde el
 // lanzamiento del bot hasta hoy). Se rellena la primera vez que llega la respuesta de /summary.
-const state = { desde: null, hasta: null, launchDate: null, tabsBuilt: false };
+const state = { desde: null, hasta: null, launchDate: null, tabsBuilt: false, marca: '' };
 
-// Combina el periodo seleccionado con parámetros extra (ej. force=true), en la misma query string.
+// Combina el periodo seleccionado (y la marca, si hay una elegida en el selector) con
+// parámetros extra (ej. force=true), en la misma query string.
 function apiQuery(extra = {}) {
   const params = new URLSearchParams(extra);
   if (state.desde) { params.set('desde', state.desde); params.set('hasta', state.hasta); }
+  if (state.marca) params.set('marca', state.marca);
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }
@@ -600,7 +602,8 @@ function saveStore() {
 const store = loadStore();
 
 function periodKey() {
-  return state.desde ? `${state.desde}_${state.hasta}` : 'todo';
+  const base = state.desde ? `${state.desde}_${state.hasta}` : 'todo';
+  return state.marca ? `${base}_${state.marca}` : base;
 }
 
 // Las pestañas de periodo son navegación, no un dato más: no deben depender de que termine
@@ -717,6 +720,102 @@ function loadPeriod() {
   loadAllPieces(false);
 }
 
+// Selector de marca: mismo patrón que las pestañas de periodo (cambia el filtro, pinta la
+// caché si ya existe para esa combinación periodo+marca, y recarga en segundo plano).
+function wireBrandPills() {
+  $('#brand-pills')?.querySelectorAll('.brand-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.marca = btn.dataset.marca || '';
+      $('#brand-pills').querySelectorAll('.brand-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const cached = store.periods[periodKey()];
+      if (cached) renderBundle(cached); else renderPlaceholder();
+      loadPeriod();
+    });
+  });
+}
+
+// Buscador de leads: busca en vivo en GHL (nombre/teléfono/email) con un pequeño debounce
+// para no disparar una petición por cada tecla. Los resultados salen en un desplegable bajo
+// el buscador; al elegir uno se abre su ficha (sin salir del dashboard) con botón a GHL.
+let leadSearchTimer = null;
+let leadSearchResultados = [];
+
+function wireLeadSearch() {
+  const input = $('#lead-search');
+  const box = $('#search-results');
+  if (!input || !box) return;
+
+  input.addEventListener('input', () => {
+    clearTimeout(leadSearchTimer);
+    const q = input.value.trim();
+    if (q.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
+    leadSearchTimer = setTimeout(() => runLeadSearch(q), 350);
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.nav-search')) box.hidden = true;
+  });
+}
+
+async function runLeadSearch(q) {
+  const box = $('#search-results');
+  box.hidden = false;
+  box.innerHTML = '<div class="result-row">Buscando&hellip;</div>';
+  try {
+    const data = await fetchJSON(`/api/leads/search?q=${encodeURIComponent(q)}`);
+    leadSearchResultados = data.resultados || [];
+    if (!leadSearchResultados.length) {
+      box.innerHTML = '<div class="result-row">Sin resultados</div>';
+      return;
+    }
+    box.innerHTML = leadSearchResultados.map((r, i) => `
+      <div class="result-row" data-idx="${i}">
+        <div class="avatar" style="background:${colorAvatar(r.nombre)}">${iniciales(r.nombre)}</div>
+        <div class="result-body">
+          <div class="result-nombre">${r.nombre}</div>
+          <div class="result-meta">${r.marca}${r.telefono ? ' &middot; ' + r.telefono : ''}</div>
+        </div>
+        <span class="result-tag">${r.etapa}</span>
+      </div>`).join('');
+    box.querySelectorAll('.result-row[data-idx]').forEach(row => {
+      row.addEventListener('click', () => {
+        showLeadCard(leadSearchResultados[Number(row.dataset.idx)]);
+        box.hidden = true;
+      });
+    });
+  } catch (e) {
+    box.innerHTML = `<div class="result-row">Error: ${e.message}</div>`;
+  }
+}
+
+function showLeadCard(lead) {
+  const card = $('#lead-card');
+  const cita = lead.cita;
+  const citaValor = !cita ? 'Sin cita' : (cita.fiable ? 'Verificada' : 'Sin verificar');
+  card.innerHTML = `
+    <div class="lead-head">
+      <div class="lead-avatar" style="background:${colorAvatar(lead.nombre)}">${iniciales(lead.nombre)}</div>
+      <div>
+        <div class="lead-nombre">${lead.nombre}</div>
+        <div class="lead-sub">${[lead.telefono, lead.email].filter(Boolean).join(' &middot; ') || 'Sin teléfono/email'} &middot; ${lead.marcaNombre}</div>
+      </div>
+      <div class="lead-actions">
+        <a class="lead-ghl-btn" href="${lead.ghlUrl}" target="_blank" rel="noopener">Ver en GHL &#8599;</a>
+        <button class="lead-close-btn" type="button" id="lead-card-close">Cerrar</button>
+      </div>
+    </div>
+    <div class="lead-grid">
+      <div class="lead-stat"><div class="ls-label">Etapa actual</div><div class="ls-value">${lead.etapa}</div></div>
+      <div class="lead-stat"><div class="ls-label">Cita</div><div class="ls-value">${citaValor}</div></div>
+      <div class="lead-stat"><div class="ls-label">Alta</div><div class="ls-value">${fmtFecha(lead.fechaAlta)}</div></div>
+    </div>
+    <div class="lead-tags">${lead.tags.map(t => `<span class="lead-tag${['lead_cualificando','lead_potencial','pago_pendiente','consulta_agendada','cliente_postventa','lead_no_potencial'].includes(t) ? ' estado' : ''}">${t}</span>`).join('')}</div>`;
+  card.hidden = false;
+  $('#lead-card-close')?.addEventListener('click', () => { card.hidden = true; });
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 // Pinta un bundle ya guardado en caché (recarga de página, o cambio a una pestaña ya vista).
 // Tolera bundles parciales: si alguna pieza falló la última vez, sencillamente no la pinta.
 function renderBundle(bundle) {
@@ -808,4 +907,6 @@ function init() {
 }
 
 $('#refresh-btn')?.addEventListener('click', updateNow);
+wireBrandPills();
+wireLeadSearch();
 init();

@@ -14,7 +14,6 @@
           <div class="eyebrow">Dashboard de funnel &middot; histórico propio</div>
           <h1 class="title">StatsDash</h1>
         </div>
-        <button id="refresh-btn" class="refresh-btn" type="button">↻ Actualizar datos</button>
       </div>
       <p class="subtitle">Conversación → Cualificado → Cita, para las 5 marcas GHL, con histórico diario guardado.</p>
       <div class="meta-row">
@@ -22,8 +21,29 @@
         <span>Fuente: GoHighLevel API + histórico propio (MongoDB)</span>
         <span id="meta-actualizado"></span>
       </div>
-      <div id="period-tabs" class="period-tabs"></div>
+
+      <nav class="navbar" aria-label="Navegación y filtros">
+        <div id="period-tabs" class="period-tabs"></div>
+        <div class="nav-divider"></div>
+        <div id="brand-pills" class="brand-pills">
+          <button class="brand-pill active" data-marca="">Todas</button>
+          <button class="brand-pill" data-marca="CYA">CYA</button>
+          <button class="brand-pill" data-marca="ETH">ETH</button>
+          <button class="brand-pill" data-marca="ETV">ETV</button>
+          <button class="brand-pill" data-marca="NAC">NAC</button>
+          <button class="brand-pill" data-marca="MNEE">MNEE</button>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-search">
+          <span class="icon">&#128269;</span>
+          <input id="lead-search" type="text" placeholder="Buscar lead por nombre o teléfono&hellip;" autocomplete="off">
+          <div id="search-results" class="search-results" hidden></div>
+        </div>
+        <button id="refresh-btn" class="refresh-btn" type="button">↻ Actualizar datos</button>
+      </nav>
     </header>
+
+    <div id="lead-card" class="lead-card" hidden></div>
 
     <section class="kpi-citas-split">
       <div class="kpis-pane" aria-label="Totales agregados">

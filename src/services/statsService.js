@@ -10,6 +10,12 @@ function isToday(fecha) {
   return fecha === todayStr();
 }
 
+// Filtro de marca opcional, usado por el selector de marca del dashboard: sin marca, las 5
+// de siempre; con marca, solo esa (misma forma de array para no bifurcar el resto del código).
+function brandsFor(marca) {
+  return marca ? [getBrand(marca)] : getBrands();
+}
+
 // Caché en memoria del cálculo en vivo de "hoy" por marca. Sin esto, cada petición que toca
 // el día actual dispara ~10-27 llamadas a GHL por marca; con varias pestañas o refrescos
 // seguidos, la cola de rate-limit se satura y las respuestas tardan más de un minuto.
@@ -265,7 +271,7 @@ function stageTotals(d) {
 // Serie diaria agregada (5 marcas sumadas) para el heatmap y la gráfica de tendencia. Si se
 // pasan desde/hasta (ej. una pestaña de mes concreto), la serie cubre exactamente ese rango;
 // si no, cubre los últimos `days` días terminando hoy (comportamiento por defecto de "Todo").
-async function getDailyTotals({ days = 30, desde, hasta } = {}) {
+async function getDailyTotals({ days = 30, desde, hasta, marca } = {}) {
   let dates;
   if (desde && hasta) {
     dates = [];
@@ -286,7 +292,8 @@ async function getDailyTotals({ days = 30, desde, hasta } = {}) {
   }
 
   const closedDates = dates.filter(f => !isToday(f));
-  const stored = await DailyStat.find({ fecha: { $in: closedDates } }).lean();
+  const marcaFiltro = marca ? { marca } : {};
+  const stored = await DailyStat.find({ fecha: { $in: closedDates }, ...marcaFiltro }).lean();
 
   // Autorreparación: si un día cerrado reciente no tiene NINGÚN documento guardado (el cron
   // nocturno no llegó a ejecutarse esa noche — típico si el servicio estuvo dormido/reiniciado
@@ -298,7 +305,7 @@ async function getDailyTotals({ days = 30, desde, hasta } = {}) {
   const botLaunch = process.env.BOT_LAUNCH_DATE || '0000-00-00';
   const missingDates = closedDates.filter(f => !datesWithData.has(f) && f >= (recentCutoff || f) && f >= botLaunch);
   if (missingDates.length) {
-    const brands = getBrands();
+    const brands = brandsFor(marca);
     const repaired = await Promise.all(
       missingDates.flatMap(fecha => brands.map(b => upsertDailyStats(b.code, fecha)))
     );
@@ -315,7 +322,7 @@ async function getDailyTotals({ days = 30, desde, hasta } = {}) {
   }
 
   if (dates.includes(todayStr())) {
-    const brands = getBrands();
+    const brands = brandsFor(marca);
     const todayStats = await Promise.all(brands.map(b => getLiveTodayStats(b)));
     const todayTotals = todayStats.reduce((acc, s) => {
       const t = stageTotals(s);
@@ -363,8 +370,8 @@ function mergeMaps(target, source) {
 
 // Agrega el funnel completo (como el Artifact) sumando los DailyStat guardados en un rango.
 // Si el rango incluye "hoy", ese día se computa en vivo y se suma también.
-async function getSummary(desde, hasta, mesReferencia) {
-  const brands = getBrands();
+async function getSummary(desde, hasta, mesReferencia, marca) {
+  const brands = brandsFor(marca);
   const perBrand = [];
 
   for (const brand of brands) {
@@ -442,7 +449,7 @@ async function getSummary(desde, hasta, mesReferencia) {
   // mesReferencia: el mes de la pestaña activa (o el mes en curso si es "Todo", que no tiene
   // un mes propio). Antes solo se calculaba para Todo/mes en curso; ahora cualquier mes
   // cerrado también obtiene su comparativa, mes completo contra mes completo, sin tocar GHL.
-  const comparativaMensual = await computeComparativaMensual(mesReferencia);
+  const comparativaMensual = await computeComparativaMensual(mesReferencia, marca);
 
   return { desde, hasta, marcas: perBrand, total, comparativaMensual };
 }
@@ -451,8 +458,8 @@ async function getSummary(desde, hasta, mesReferencia) {
 // compara "hasta hoy" contra "el mes anterior hasta el mismo día" (para no penalizar un mes
 // a medias); si es un mes ya cerrado, compara el mes completo contra el mes anterior
 // completo — ambos cerrados, así que no hace falta ninguna llamada a GHL en absoluto.
-async function computeComparativaMensual(mesReferencia) {
-  const brands = getBrands();
+async function computeComparativaMensual(mesReferencia, marca) {
+  const brands = brandsFor(marca);
   const [anioRef, mesRef] = mesReferencia.split('-').map(Number); // mesRef: 1-12
   const esMesActual = mesReferencia === todayStr().slice(0, 7);
 
@@ -510,8 +517,8 @@ function mapaAObjeto(m) {
 
 // Canal de entrada por marca, sumando lo ya guardado día a día en DailyStat (nada de GHL en
 // vivo salvo "hoy"). force=true refresca el día de hoy en vez de servir su caché de 3 min.
-async function computeChannelBreakdown(desde, hasta, force = false) {
-  const brands = getBrands();
+async function computeChannelBreakdown(desde, hasta, force = false, marca) {
+  const brands = brandsFor(marca);
   const perBrand = await Promise.all(brands.map(async brand => {
     const docs = await DailyStat.find({ marca: brand.code, fecha: { $gte: desde, $lte: hasta } }).lean();
     const counts = {};
@@ -529,16 +536,16 @@ async function computeChannelBreakdown(desde, hasta, force = false) {
   return { desde, hasta, marcas: perBrand, computedAt: new Date().toISOString() };
 }
 
-function getChannelBreakdown(desde, hasta, force = false) {
-  return computeChannelBreakdown(desde, hasta, force);
+function getChannelBreakdown(desde, hasta, force = false, marca) {
+  return computeChannelBreakdown(desde, hasta, force, marca);
 }
 
 // Timeline de citas (tag consulta_agendada) por marca, con nombre y fecha, y verificación por
 // el tag `pago info` (validado a mano el 2026-07-30 en las 4 marcas principales: coincide al
 // 100% con una cita/pago real, tanto si gestiona el bot como un humano). Se compone sumando
 // las citas ya guardadas día a día — nada de GHL en vivo salvo "hoy".
-async function computeCitasTimeline(desde, hasta, force = false) {
-  const brands = getBrands();
+async function computeCitasTimeline(desde, hasta, force = false, marca) {
+  const brands = brandsFor(marca);
   const perBrand = await Promise.all(brands.map(async brand => {
     const docs = await DailyStat.find({ marca: brand.code, fecha: { $gte: desde, $lte: hasta } }).lean();
     const citas = docs.flatMap(d => d.citas || []);
@@ -558,15 +565,15 @@ async function computeCitasTimeline(desde, hasta, force = false) {
   return { desde, hasta, marcas: perBrand, computedAt: new Date().toISOString() };
 }
 
-function getCitasTimeline(desde, hasta, force = false) {
-  return computeCitasTimeline(desde, hasta, force);
+function getCitasTimeline(desde, hasta, force = false, marca) {
+  return computeCitasTimeline(desde, hasta, force, marca);
 }
 
 // Procedencia (sessionSource, incluido TikTok) y rendimiento por campaña de pago (utm
 // campaign), sobre la población real del funnel. Se compone sumando lo ya guardado día a
 // día — nada de GHL en vivo salvo "hoy".
-async function computeAttribution(desde, hasta, force = false) {
-  const brands = getBrands();
+async function computeAttribution(desde, hasta, force = false, marca) {
+  const brands = brandsFor(marca);
   const sessionTotals = {};
   const campanasPago = new Map(); // nombre normalizado -> { nombre, leads, cualificados, citas }
   const campanasOrganico = new Map();
@@ -605,8 +612,8 @@ async function computeAttribution(desde, hasta, force = false) {
   };
 }
 
-function getAttribution(desde, hasta, force = false) {
-  return computeAttribution(desde, hasta, force);
+function getAttribution(desde, hasta, force = false, marca) {
+  return computeAttribution(desde, hasta, force, marca);
 }
 
 module.exports = {

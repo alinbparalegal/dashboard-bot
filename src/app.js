@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const connectDB = require('./config/db');
 const statsRoutes = require('./routes/statsRoutes');
+const leadsRoutes = require('./routes/leadsRoutes');
 const basicAuth = require('./middleware/basicAuth');
 
 require('./services/dailyStatsCron');
@@ -20,6 +21,7 @@ app.use(basicAuth);
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 app.use('/api/stats', statsRoutes);
+app.use('/api/leads', leadsRoutes);
 
 app.listen(PORT, () => {
   console.log(`[Servidor] Escuchando en http://localhost:${PORT}`);

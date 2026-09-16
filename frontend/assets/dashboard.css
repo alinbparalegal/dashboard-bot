@@ -46,7 +46,7 @@ header.page { display: flex; flex-direction: column; gap: 6px; margin-bottom: 28
 .header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .refresh-btn {
   flex: 0 0 auto; background: var(--surface); color: var(--accent-ink); border: 1px solid var(--border);
-  border-radius: 8px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  border-radius: 10px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
   box-shadow: var(--shadow);
 }
 .refresh-btn:hover { border-color: var(--accent); }
@@ -59,7 +59,7 @@ h1.title { font-size: 28px; font-weight: 600; }
 
 /* Control segmentado (estilo iOS) para las pestañas de periodo */
 .period-tabs {
-  display: inline-flex; gap: 2px; margin-top: 14px; max-width: 100%; overflow-x: auto;
+  display: inline-flex; gap: 2px; max-width: 100%; overflow-x: auto; flex: 0 0 auto;
   background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px; padding: 3px;
 }
 .period-tab {
@@ -69,6 +69,71 @@ h1.title { font-size: 28px; font-weight: 600; }
 .period-tab:hover { color: var(--ink); }
 .period-tab.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
 .period-tab:disabled { opacity: 0.5; cursor: default; }
+
+/* Barra de navegación: más presencia visual (caja propia), agrupa pestañas de periodo,
+   selector de marca, buscador de leads y el botón de refrescar. */
+.navbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 10px 14px; box-shadow: var(--shadow); margin-top: 16px;
+}
+.nav-divider { width: 1px; align-self: stretch; background: var(--separator-inset); }
+@media (max-width: 760px) { .nav-divider { display: none; } }
+
+.brand-pills { display: flex; gap: 6px; flex: 0 0 auto; flex-wrap: wrap; }
+.brand-pill {
+  appearance: none; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft);
+  font: inherit; font-size: 11.5px; font-weight: 700; padding: 6px 11px; border-radius: 999px; cursor: pointer;
+}
+.brand-pill:hover { border-color: var(--accent); }
+.brand-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.nav-search { position: relative; flex: 1 1 220px; min-width: 180px; }
+.nav-search input {
+  width: 100%; font: inherit; font-size: 13px; padding: 8px 12px 8px 32px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface-alt); color: var(--ink);
+}
+.nav-search input::placeholder { color: var(--ink-faint); }
+.nav-search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.nav-search .icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-faint); font-size: 12.5px; pointer-events: none; }
+@media (max-width: 760px) { .nav-search { flex-basis: 100%; order: 5; } }
+
+/* Resultados de busqueda: desplegable bajo el buscador */
+.search-results {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 10;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+  overflow: hidden; max-height: 320px; overflow-y: auto;
+}
+.result-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid var(--separator-inset); cursor: pointer; }
+.result-row:first-child { border-top: none; }
+.result-row:hover { background: var(--surface-alt); }
+.result-body { flex: 1 1 auto; min-width: 0; }
+.result-nombre { font-size: 13px; font-weight: 700; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result-meta { font-size: 11px; color: var(--ink-faint); }
+.result-tag { font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); flex: 0 0 auto; white-space: nowrap; }
+
+/* Ficha de lead, se abre al elegir un resultado de busqueda */
+.lead-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow);
+  padding: 18px 20px; margin-bottom: 24px; }
+.lead-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+.lead-avatar { width: 42px; height: 42px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 15px; font-weight: 700; text-transform: uppercase; }
+.lead-nombre { font-size: 16px; font-weight: 800; text-transform: capitalize; }
+.lead-sub { font-size: 12px; color: var(--ink-faint); font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+.lead-actions { margin-left: auto; display: flex; gap: 8px; }
+.lead-ghl-btn, .lead-close-btn {
+  appearance: none; font: inherit; font-size: 12px; font-weight: 700; padding: 7px 13px; border-radius: 8px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.lead-ghl-btn { border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent-ink); text-decoration: none; }
+.lead-close-btn { border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); }
+.lead-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.lead-stat { background: var(--surface-alt); border-radius: 10px; padding: 9px 11px; }
+.lead-stat .ls-label { font-size: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.03em; }
+.lead-stat .ls-value { font-size: 13.5px; font-weight: 700; margin-top: 2px; }
+.lead-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.lead-tag { font-size: 10.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--surface-alt); color: var(--ink-soft); }
+.lead-tag.estado { background: var(--accent-soft); color: var(--accent-ink); }
 
 /* Encabezado pequeño en mayúsculas para el interior de una caja agrupada (estilo iOS) */
 .grouped-header { font-size: 11.5px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase;

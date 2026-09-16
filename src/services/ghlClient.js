@@ -139,6 +139,29 @@ async function listByTag(brand, tag, gte, lte, pageLimit = 100) {
   });
 }
 
+// Búsqueda libre por nombre/teléfono/email (buscador de leads del dashboard) — GHL casa el
+// texto contra esos campos con el parámetro `query` de contacts/search, igual que el buscador
+// nativo de su propio panel.
+async function searchContactsByQuery(brand, query, pageLimit = 6) {
+  return rateLimited(async () => {
+    const res = await fetch(GHL_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${brand.token}`,
+        Version: '2021-07-28',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ locationId: brand.locationId, pageLimit, query }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`GHL ${res.status}: ${text.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return data.contacts || [];
+  });
+}
+
 async function getContact(brand, contactId) {
   return rateLimited(async () => {
     const res = await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
@@ -224,4 +247,4 @@ async function listByAnyTag(brand, tags, gte, lte) {
   return all;
 }
 
-module.exports = { countTag, countTagPair, countBotField, countAll, listByTag, getContact, listByAnyTag, getLastMessageType };
+module.exports = { countTag, countTagPair, countBotField, countAll, listByTag, getContact, listByAnyTag, getLastMessageType, searchContactsByQuery };

@@ -47,8 +47,8 @@ function getLaunchDate(req, res) {
 async function getDailyTotals(req, res) {
   try {
     const days = parseInt(req.query.days, 10) || 30;
-    const { desde, hasta } = req.query;
-    const data = await statsService.getDailyTotals({ days, desde, hasta });
+    const { desde, hasta, marca } = req.query;
+    const data = await statsService.getDailyTotals({ days, desde, hasta, marca: marca || undefined });
     res.status(200).json(data);
   } catch (error) {
     console.error('Error en getDailyTotals:', error);
@@ -77,7 +77,7 @@ async function getSummary(req, res) {
     // "Todo" (sin desde/hasta explícitos en la query) no tiene un mes propio con el que
     // comparar — se usa el mes en curso como referencia. Una pestaña de mes sí lo tiene.
     const mesReferencia = req.query.desde ? hasta.slice(0, 7) : statsService.todayStr().slice(0, 7);
-    const data = await statsService.getSummary(desde, hasta, mesReferencia);
+    const data = await statsService.getSummary(desde, hasta, mesReferencia, req.query.marca || undefined);
     res.status(200).json(data);
   } catch (error) {
     console.error('Error en getSummary:', error);
@@ -90,7 +90,7 @@ async function getChannels(req, res) {
     const hasta = req.query.hasta || statsService.todayStr();
     const desde = req.query.desde || process.env.BOT_LAUNCH_DATE || hasta;
     const force = req.query.force === 'true';
-    const data = await statsService.getChannelBreakdown(desde, hasta, force);
+    const data = await statsService.getChannelBreakdown(desde, hasta, force, req.query.marca || undefined);
     res.status(200).json(data);
   } catch (error) {
     console.error('Error en getChannels:', error);
@@ -103,7 +103,7 @@ async function getTimeline(req, res) {
     const hasta = req.query.hasta || statsService.todayStr();
     const desde = req.query.desde || process.env.BOT_LAUNCH_DATE || hasta;
     const force = req.query.force === 'true';
-    const data = await statsService.getCitasTimeline(desde, hasta, force);
+    const data = await statsService.getCitasTimeline(desde, hasta, force, req.query.marca || undefined);
     res.status(200).json(data);
   } catch (error) {
     console.error('Error en getTimeline:', error);
@@ -116,7 +116,7 @@ async function getAttribution(req, res) {
     const hasta = req.query.hasta || statsService.todayStr();
     const desde = req.query.desde || process.env.BOT_LAUNCH_DATE || hasta;
     const force = req.query.force === 'true';
-    const data = await statsService.getAttribution(desde, hasta, force);
+    const data = await statsService.getAttribution(desde, hasta, force, req.query.marca || undefined);
     res.status(200).json(data);
   } catch (error) {
     console.error('Error en getAttribution:', error);
