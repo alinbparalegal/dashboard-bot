@@ -64,14 +64,18 @@ h1.title { font-size: 28px; font-weight: 600; }
 .period-tab.active { background: var(--accent); color: var(--surface); border-color: var(--accent); }
 .period-tab:disabled { opacity: 0.5; cursor: default; }
 
-/* KPI strip */
-.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border);
-  border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 32px; box-shadow: var(--shadow); }
-.kpi { background: var(--surface); padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+/* KPIs (verticales, 30%, unidos en una sola caja) + últimas citas (70%) */
+.kpi-citas-split { display: grid; grid-template-columns: 3fr 7fr; gap: 16px; margin-bottom: 32px; align-items: stretch; }
+.kpis-pane { display: flex; flex-direction: column; background: var(--border); gap: 1px;
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+.kpi { background: var(--surface); padding: 16px 20px; display: flex; flex-direction: column; gap: 4px; }
 .kpi .label { font-size: 11.5px; color: var(--ink-faint); }
 .kpi .value { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 600; }
 .kpi .sub { font-size: 11.5px; color: var(--ink-soft); }
 .kpi.accent .value { color: var(--accent-ink); }
+.citas-pane { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 18px 20px; min-width: 0; }
+.citas-pane h2 { font-size: 16px; margin-bottom: 12px; }
+@media (max-width: 760px) { .kpi-citas-split { grid-template-columns: 1fr; gap: 16px; } }
 
 /* Panel de dos columnas: heatmap + tendencia */
 .panels-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; align-items: start; }
@@ -216,9 +220,7 @@ section.chart-card { margin-bottom: 32px; }
 .timeline-row .tl-status { font-size: 10px; text-transform: uppercase; color: var(--ink-faint); font-family: ui-monospace, monospace; }
 @media (max-width: 560px) { .timeline-row { grid-template-columns: 1fr; } }
 
-/* Últimas 10 citas */
-.last-citas-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 32px; box-shadow: var(--shadow); }
-.last-citas-card h2 { font-size: 16px; margin-bottom: 12px; }
+/* Últimas 10 citas (dentro de .citas-pane, ver kpi-citas-split) */
 .lc-row { display: grid; grid-template-columns: 110px 50px 1fr 90px auto; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
 .lc-row:last-child { border-bottom: none; }
 .lc-row .lc-fecha { font-family: ui-monospace, monospace; color: var(--ink-soft); white-space: nowrap; }
@@ -245,7 +247,6 @@ footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--border
 .loading { color: var(--ink-faint); font-style: italic; padding: 20px 0; }
 
 @media (max-width: 640px) {
-  .kpis { grid-template-columns: 1fr; }
   .funnel { flex-direction: column; align-items: stretch; }
   .arrow-gap { width: auto; flex-direction: row; padding: 4px 0; }
 }

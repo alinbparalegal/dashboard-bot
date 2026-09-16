@@ -25,32 +25,33 @@
       <div id="period-tabs" class="period-tabs"></div>
     </header>
 
-    <section class="kpis" aria-label="Totales agregados">
-      <div class="kpi">
-        <span class="label">Conversación</span>
-        <span class="value" id="kpi-conversacion">—</span>
-        <span class="sub">leads con tag de estado del bot</span>
+    <section class="kpi-citas-split">
+      <div class="kpis-pane" aria-label="Totales agregados">
+        <div class="kpi">
+          <span class="label">Conversación</span>
+          <span class="value" id="kpi-conversacion">—</span>
+          <span class="sub">leads con tag de estado del bot</span>
+        </div>
+        <div class="kpi">
+          <span class="label">Cualificado</span>
+          <span class="value" id="kpi-cualificado">—</span>
+          <span class="sub" id="kpi-cualificado-sub">—</span>
+        </div>
+        <div class="kpi accent">
+          <span class="label">Cita</span>
+          <span class="value" id="kpi-cita">—</span>
+          <span class="sub" id="kpi-cita-sub">—</span>
+        </div>
+        <div class="kpi">
+          <span class="label">Ingreso estimado</span>
+          <span class="value" id="kpi-ingreso">—</span>
+          <span class="sub">según precio de asesoría · rango online–presencial</span>
+        </div>
       </div>
-      <div class="kpi">
-        <span class="label">Cualificado</span>
-        <span class="value" id="kpi-cualificado">—</span>
-        <span class="sub" id="kpi-cualificado-sub">—</span>
+      <div class="citas-pane">
+        <h2>Últimas 10 citas</h2>
+        <div id="ultimas-citas"><div class="loading">Cargando…</div></div>
       </div>
-      <div class="kpi accent">
-        <span class="label">Cita</span>
-        <span class="value" id="kpi-cita">—</span>
-        <span class="sub" id="kpi-cita-sub">—</span>
-      </div>
-      <div class="kpi">
-        <span class="label">Ingreso estimado</span>
-        <span class="value" id="kpi-ingreso">—</span>
-        <span class="sub">según precio de asesoría · rango online–presencial</span>
-      </div>
-    </section>
-
-    <section class="last-citas-card">
-      <h2>Últimas 10 citas</h2>
-      <div id="ultimas-citas"><div class="loading">Cargando…</div></div>
     </section>
 
     <section class="panels-grid">
