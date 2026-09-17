@@ -1,5 +1,45 @@
 const statsService = require('../services/statsService');
 
+// Endpoint TEMPORAL de un solo uso: recalcula (upsert) el histórico de un rango de días ya
+// cerrados. Reutilizado para el backfill de julio con citas_fiables. Se borra tras usarlo.
+function dateRangeArray(desdeStr, hastaStr) {
+  const dates = [];
+  const cur = new Date(desdeStr + 'T00:00:00Z');
+  const end = new Date(hastaStr + 'T00:00:00Z');
+  while (cur <= end) {
+    dates.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+async function runBackfillCitasFiables(req, res) {
+  const { desde, hasta, marca } = req.query;
+  if (!desde || !hasta) return res.status(400).json({ message: 'Faltan desde/hasta' });
+  const fechas = dateRangeArray(desde, hasta);
+  const resultado = [];
+  for (const fecha of fechas) {
+    try {
+      if (marca) await statsService.upsertDailyStats(marca, fecha);
+      else await statsService.upsertDailyStatsAllBrands(fecha);
+      resultado.push({ fecha, ok: true });
+    } catch (e) {
+      resultado.push({ fecha, ok: false, error: e.message });
+    }
+  }
+  res.status(200).json({ fechas: resultado.length, resultado });
+}
+
+// Endpoint TEMPORAL de un solo uso: borra el histórico de un rango de días (junio, considerado
+// no fiable al 100% en el funcionamiento del bot). Se borra tras usarlo.
+async function runDeleteDays(req, res) {
+  const { desde, hasta } = req.query;
+  if (!desde || !hasta) return res.status(400).json({ message: 'Faltan desde/hasta' });
+  const DailyStat = require('../models/DailyStat');
+  const result = await DailyStat.deleteMany({ fecha: { $gte: desde, $lte: hasta } });
+  res.status(200).json({ deletedCount: result.deletedCount });
+}
+
 // Sin Mongo ni GHL: las pestañas de periodo (Todo/mes) necesitan saber desde cuándo hay
 // datos, pero no deberían depender de que termine ninguna consulta lenta para aparecer.
 function getLaunchDate(req, res) {
@@ -86,4 +126,4 @@ async function getAttribution(req, res) {
   }
 }
 
-module.exports = { getLaunchDate, getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution };
+module.exports = { getLaunchDate, getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution, runBackfillCitasFiables, runDeleteDays };

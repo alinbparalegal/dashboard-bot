@@ -42,4 +42,4 @@ services:
       - key: GHL_MNEE_BOT_FIELD_ID
         value: ZYb9ycQeft7jb5C4s6i2
       - key: BOT_LAUNCH_DATE
-        value: 2026-06-25
+        value: 2026-07-01
