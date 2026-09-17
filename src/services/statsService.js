@@ -548,10 +548,11 @@ function getChannelBreakdown(desde, hasta, force = false, marca) {
   return computeChannelBreakdown(desde, hasta, force, marca);
 }
 
-// Timeline de citas (tag consulta_agendada) por marca, con nombre y fecha, y verificación por
-// el tag `pago info` (validado a mano el 2026-07-30 en las 4 marcas principales: coincide al
-// 100% con una cita/pago real, tanto si gestiona el bot como un humano). Se compone sumando
-// las citas ya guardadas día a día — nada de GHL en vivo salvo "hoy".
+// Timeline de citas por marca: solo las fiables (BOT + pago info + fecha de pago), igual que
+// el KPI "Cita" y el resto del dashboard — antes salía cualquier contacto con el tag
+// consulta_agendada, incluidas las escaladas a un humano, lo que no encajaba con "cita" tal
+// como se cuenta en todas partes desde la redefinición (ver computeCitasFiables). Se compone
+// sumando las citas ya guardadas día a día — nada de GHL en vivo salvo "hoy".
 async function computeCitasTimeline(desde, hasta, force = false, marca) {
   const brands = brandsFor(marca);
   const perBrand = await Promise.all(brands.map(async brand => {
@@ -561,14 +562,9 @@ async function computeCitasTimeline(desde, hasta, force = false, marca) {
       const live = await getLiveTodayStats(brand, force);
       citas.push(...(live.citas || []));
     }
-    citas.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+    const fiables = citas.filter(c => c.fiable).sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 
-    const resumenGestion = citas.reduce((acc, c) => {
-      if (c.esBot) acc.bot++; else if (c.gestionadoPor) acc.humano++; else acc.desconocido++;
-      return acc;
-    }, { bot: 0, humano: 0, desconocido: 0 });
-
-    return { marca: brand.code, nombre: brand.name, citas, resumenGestion };
+    return { marca: brand.code, nombre: brand.name, citas: fiables };
   }));
   return { desde, hasta, marcas: perBrand, computedAt: new Date().toISOString() };
 }

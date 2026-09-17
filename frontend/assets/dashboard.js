@@ -514,16 +514,11 @@ function badgeCita(c) {
 }
 
 // Igual que la fila de marcas de arriba: las 5 columnas comparten una sola caja, compactas
-// (icono + nº de citas + reparto bot/humano), y "Ver citas" abre el detalle completo a todo
-// el ancho de la caja — el espacio horizontal de una columna de 1/5 no da para una lista de
-// dos columnas de citas legible.
+// (icono + nº de citas fiables), y "Ver citas" abre el detalle completo a todo el ancho de la
+// caja — el espacio horizontal de una columna de 1/5 no da para una lista de dos columnas de
+// citas legible. Solo se cuentan las fiables (BOT + pago info + fecha de pago); las escaladas
+// a un humano no cuentan como "cita" aquí, igual que en el resto del dashboard.
 function renderTimelineColumn(m) {
-  const g = m.resumenGestion || {};
-  const resumenBits = [
-    g.bot ? `${g.bot} bot` : null,
-    g.humano ? `${g.humano} humano` : null,
-    g.desconocido ? `${g.desconocido} s/d` : null,
-  ].filter(Boolean).join(' · ');
   return `
   <article class="tl-col" data-marca="${m.marca}">
     <div class="brand-head">
@@ -535,24 +530,17 @@ function renderTimelineColumn(m) {
     </div>
     <div class="tl-col-count">${fmt(m.citas.length)}</div>
     <div class="tl-col-sub">${m.citas.length ? 'citas' : 'sin citas todavía'}</div>
-    ${resumenBits ? `<div class="tl-col-resumen">${resumenBits}</div>` : ''}
     ${m.citas.length ? `<button type="button" class="brand-detail-toggle" data-marca="${m.marca}">Ver citas</button>` : ''}
   </article>`;
 }
 
 function renderTimelineDetailContent(m) {
-  const g = m.resumenGestion || {};
-  const resumenBits = [
-    g.bot ? `${g.bot} por el bot` : null,
-    g.humano ? `${g.humano} escaladas a humano` : null,
-    g.desconocido ? `${g.desconocido} sin dato` : null,
-  ].filter(Boolean).join(' · ');
   const rows = m.citas.map(c => `
     <div class="timeline-row">
       <div class="avatar" style="background:${colorAvatar(c.nombre)}">${iniciales(c.nombre)}</div>
       <div class="tl-body">
         <div class="tl-nombre">${c.nombre}</div>
-        <div class="tl-gestion">${c.esBot ? 'gestionada por el bot' : `gestionada por ${c.gestionadoPor || 'humano'}`}</div>
+        <div class="tl-gestion">gestionada por el bot</div>
       </div>
       <div class="tl-trailing">
         <span class="tl-fecha">${fmtFecha(c.fecha)}</span>
@@ -565,7 +553,6 @@ function renderTimelineDetailContent(m) {
       <h3>${m.nombre} <span class="tl-count">${m.citas.length} citas</span></h3>
       <button type="button" class="brand-detail-close" aria-label="Cerrar">&times;</button>
     </div>
-    ${resumenBits ? `<p class="tl-resumen-gestion">${resumenBits}</p>` : ''}
     <div class="timeline-rows">${rows}</div>`;
 }
 
