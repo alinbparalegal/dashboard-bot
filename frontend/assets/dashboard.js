@@ -513,38 +513,85 @@ function badgeCita(c) {
   return '<span class="badge warn">sin fecha de pago</span>';
 }
 
+// Igual que la fila de marcas de arriba: las 5 columnas comparten una sola caja, compactas
+// (icono + nº de citas + reparto bot/humano), y "Ver citas" abre el detalle completo a todo
+// el ancho de la caja — el espacio horizontal de una columna de 1/5 no da para una lista de
+// dos columnas de citas legible.
+function renderTimelineColumn(m) {
+  const g = m.resumenGestion || {};
+  const resumenBits = [
+    g.bot ? `${g.bot} bot` : null,
+    g.humano ? `${g.humano} humano` : null,
+    g.desconocido ? `${g.desconocido} s/d` : null,
+  ].filter(Boolean).join(' · ');
+  return `
+  <article class="tl-col" data-marca="${m.marca}">
+    <div class="brand-head">
+      <div class="bc-icon" style="background:${BRAND_COLOR[m.marca] || 'var(--accent)'}">${BRAND_ICON[m.marca] || ''}</div>
+      <div class="name-block">
+        <h2>${m.nombre}</h2>
+        <span class="code">${m.marca}</span>
+      </div>
+    </div>
+    <div class="tl-col-count">${fmt(m.citas.length)}</div>
+    <div class="tl-col-sub">${m.citas.length ? 'citas' : 'sin citas todavía'}</div>
+    ${resumenBits ? `<div class="tl-col-resumen">${resumenBits}</div>` : ''}
+    ${m.citas.length ? `<button type="button" class="brand-detail-toggle" data-marca="${m.marca}">Ver citas</button>` : ''}
+  </article>`;
+}
+
+function renderTimelineDetailContent(m) {
+  const g = m.resumenGestion || {};
+  const resumenBits = [
+    g.bot ? `${g.bot} por el bot` : null,
+    g.humano ? `${g.humano} escaladas a humano` : null,
+    g.desconocido ? `${g.desconocido} sin dato` : null,
+  ].filter(Boolean).join(' · ');
+  const rows = m.citas.map(c => `
+    <div class="timeline-row">
+      <div class="avatar" style="background:${colorAvatar(c.nombre)}">${iniciales(c.nombre)}</div>
+      <div class="tl-body">
+        <div class="tl-nombre">${c.nombre}</div>
+        <div class="tl-gestion">${c.esBot ? 'gestionada por el bot' : `gestionada por ${c.gestionadoPor || 'humano'}`}</div>
+      </div>
+      <div class="tl-trailing">
+        <span class="tl-fecha">${fmtFecha(c.fecha)}</span>
+        ${badgeCita(c)}
+      </div>
+    </div>`).join('');
+  return `
+    <div class="brand-detail-head">
+      <div class="bc-icon" style="background:${BRAND_COLOR[m.marca] || 'var(--accent)'}">${BRAND_ICON[m.marca] || ''}</div>
+      <h3>${m.nombre} <span class="tl-count">${m.citas.length} citas</span></h3>
+      <button type="button" class="brand-detail-close" aria-label="Cerrar">&times;</button>
+    </div>
+    ${resumenBits ? `<p class="tl-resumen-gestion">${resumenBits}</p>` : ''}
+    <div class="timeline-rows">${rows}</div>`;
+}
+
+let timelinePorCodigo = {};
+
 function renderTimeline(marcas, computedAt) {
   $('#timeline-computed-at').textContent = computedAt ? `Calculado a las ${fmtHora(computedAt)}` : '';
-  const html = marcas.map(m => {
-    if (!m.citas.length) {
-      return `<div class="timeline-brand"><h3>${m.nombre} <span class="tl-count">0 citas</span></h3></div>`;
-    }
-    const g = m.resumenGestion || {};
-    const resumenBits = [
-      g.bot ? `${g.bot} por el bot` : null,
-      g.humano ? `${g.humano} escaladas a humano` : null,
-      g.desconocido ? `${g.desconocido} sin dato` : null,
-    ].filter(Boolean).join(' · ');
-    const rows = m.citas.map(c => `
-      <div class="timeline-row">
-        <div class="avatar" style="background:${colorAvatar(c.nombre)}">${iniciales(c.nombre)}</div>
-        <div class="tl-body">
-          <div class="tl-nombre">${c.nombre}</div>
-          <div class="tl-gestion">${c.esBot ? 'gestionada por el bot' : `gestionada por ${c.gestionadoPor || 'humano'}`}</div>
-        </div>
-        <div class="tl-trailing">
-          <span class="tl-fecha">${fmtFecha(c.fecha)}</span>
-          ${badgeCita(c)}
-        </div>
-      </div>`).join('');
-    return `
-      <div class="timeline-brand">
-        <h3>${m.nombre} <span class="tl-count">${m.citas.length} citas</span></h3>
-        ${resumenBits ? `<p class="tl-resumen-gestion">${resumenBits}</p>` : ''}
-        ${rows}
-      </div>`;
-  }).join('');
-  $('#timeline').innerHTML = html;
+  timelinePorCodigo = Object.fromEntries(marcas.map(m => [m.marca, m]));
+  $('#timeline').innerHTML = marcas.map(renderTimelineColumn).join('');
+  $('#timeline-detail-full').hidden = true;
+  $('#timeline').querySelectorAll('.brand-detail-toggle').forEach(btn => {
+    btn.addEventListener('click', () => openTimelineDetail(btn.dataset.marca));
+  });
+}
+
+function openTimelineDetail(marca) {
+  const panel = $('#timeline-detail-full');
+  const m = timelinePorCodigo[marca];
+  if (!m) return;
+  const yaAbierto = !panel.hidden && panel.dataset.marca === marca;
+  if (yaAbierto) { panel.hidden = true; return; }
+  panel.dataset.marca = marca;
+  panel.innerHTML = renderTimelineDetailContent(m);
+  panel.hidden = false;
+  panel.querySelector('.brand-detail-close')?.addEventListener('click', () => { panel.hidden = true; });
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function renderUltimasCitas(marcas) {
@@ -885,6 +932,7 @@ function renderPlaceholder() {
     .forEach(sel => { $(sel).innerHTML = msg; });
   $('#trend-chart').innerHTML = '';
   $('#brand-detail-full').hidden = true;
+  $('#timeline-detail-full').hidden = true;
   $('#kpi-conversacion').textContent = '—';
   $('#kpi-cualificado').textContent = '—';
   $('#kpi-cita').textContent = '—';

@@ -296,16 +296,34 @@ section.chart-card { margin-bottom: 32px; }
 .detail-extra b { font-family: ui-monospace, monospace; color: var(--ink); }
 
 /* Timeline de citas */
-.timeline-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin-bottom: 32px; box-shadow: var(--shadow); }
+.timeline-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px 0; margin-bottom: 32px; box-shadow: var(--shadow); }
 .timeline-card h2 { font-size: 16px; }
 .timeline-card .header-top { margin-bottom: 0; align-items: baseline; }
 .tl-computed { font-size: 11px; color: var(--ink-faint); font-style: italic; white-space: nowrap; }
-.timeline-brand { margin-top: 16px; }
-.timeline-brand h3 { font-size: 13px; margin-bottom: 8px; display: flex; align-items: baseline; gap: 8px; }
-.timeline-brand h3 .tl-count { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); font-weight: 400; }
+.tl-count { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); font-weight: 400; }
 .tl-resumen-gestion { font-size: 11px; color: var(--ink-soft); margin: -2px 0 6px; }
+
+/* Timeline por marca: misma caja compartida en 5 columnas que el análisis de marcas de
+   arriba — cada columna resume (nº de citas, reparto bot/humano) y "Ver citas" abre el
+   detalle completo (dos columnas de filas) a todo el ancho de la caja. */
+.timeline-brands-row { display: grid; grid-template-columns: repeat(5, 1fr); margin: 16px -20px 0; }
+@media (max-width: 1100px) { .timeline-brands-row { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px) { .timeline-brands-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 460px) { .timeline-brands-row { grid-template-columns: 1fr; } }
+.tl-col { padding: 14px 16px; border-left: 1px solid var(--separator-inset); border-top: 1px solid var(--border); }
+.tl-col:first-child, .tl-col:nth-child(5n+1) { border-left: none; }
+.tl-col-count { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; }
+.tl-col-sub { font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.03em; margin-top: -2px; }
+.tl-col-resumen { font-size: 11px; color: var(--ink-soft); margin-top: 8px; }
+.timeline-detail-full:not([hidden]) { border-top: 1px solid var(--border); margin: 0 -20px; padding: 16px 20px; }
+/* 2 columnas x ~10 filas visibles; con más citas que eso, hace scroll en vez de alargar
+   la página indefinidamente. */
+.timeline-rows {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px;
+  max-height: 460px; overflow-y: auto; padding-right: 4px;
+}
+@media (max-width: 560px) { .timeline-rows { grid-template-columns: 1fr; max-height: 400px; } }
 .timeline-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--separator-inset); font-size: 12.5px; }
-.timeline-row:last-child { border-bottom: none; }
 .tl-body { flex: 1 1 auto; min-width: 0; }
 .timeline-row .tl-nombre { font-weight: 700; text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timeline-row .tl-gestion { font-size: 11px; color: var(--ink-faint); text-transform: capitalize; }
