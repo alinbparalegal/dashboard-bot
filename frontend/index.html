@@ -102,9 +102,9 @@
     <section class="compare-card">
       <div class="compare-split">
         <div class="compare-pane">
-          <h3>Comparativa entre marcas</h3>
-          <p class="pane-sub">volumen del periodo — comparable entre marcas</p>
-          <div id="brand-volume"></div>
+          <h3>Citas por marca</h3>
+          <p class="pane-sub">reparto proporcional del periodo</p>
+          <div id="citas-bar"></div>
         </div>
         <div class="compare-divider"></div>
         <div class="compare-pane">
@@ -115,19 +115,13 @@
       </div>
     </section>
 
-    <section class="panels-grid">
-      <div class="chart-card">
-        <h2>Citas por marca</h2>
-        <div id="donut-citas"></div>
+    <section class="chart-card">
+      <div class="header-top">
+        <h2>Procedencia real</h2>
+        <span id="attribution-computed-at" class="tl-computed"></span>
       </div>
-      <div class="chart-card">
-        <div class="header-top">
-          <h2>Procedencia real</h2>
-          <span id="attribution-computed-at" class="tl-computed"></span>
-        </div>
-        <p class="detail-intro">Canal de mensajería (WhatsApp/Instagram/Facebook/TikTok) cuando hay conversación; si no, el origen de tráfico que asigna GHL.</p>
-        <div id="donut-sessionsource"><div class="loading">Cargando…</div></div>
-      </div>
+      <p class="detail-intro">Canal de mensajería (WhatsApp/Instagram/Facebook/TikTok) cuando hay conversación; si no, el origen de tráfico que asigna GHL.</p>
+      <div id="donut-sessionsource"><div class="loading">Cargando…</div></div>
     </section>
 
     <section class="chart-card">

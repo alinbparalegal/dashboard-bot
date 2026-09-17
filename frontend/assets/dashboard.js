@@ -258,25 +258,25 @@ function renderBrandCompare(comparativaMensual) {
   }).join('');
 }
 
-// Volumen del periodo activo por marca: una sola barra, escala compartida entre las 5
-// marcas (sí comparables entre sí), con cualificado/cita/tasa como cifras exactas al lado —
-// separado de la evolución mensual para no mezclar dos preguntas distintas en un gráfico.
-function renderBrandVolume(marcas) {
-  const maxConv = Math.max(...marcas.map(m => m.conversacion), 1);
-  const rows = marcas.map(m => {
-    const tasa = m.conversacion ? (m.etapa2_cita / m.conversacion * 100) : 0;
-    return `
-    <div class="vol-row">
-      <span class="vol-name">${m.marca}</span>
-      <div class="vol-track"><div class="vol-fill" style="width:${(m.conversacion / maxConv * 100).toFixed(1)}%"></div></div>
-      <span class="vol-num">${fmt(m.etapa1_cualificado)}</span>
-      <span class="vol-num">${fmt(m.etapa2_cita)}</span>
-      <span class="vol-tasa">${pct(tasa)}%</span>
-    </div>`;
-  }).join('');
-  $('#brand-volume').innerHTML = `
-    <div class="vol-head"><span>Marca</span><span>Conversación</span><span>Cualif.</span><span>Cita</span><span>Tasa</span></div>
-    ${rows}`;
+// Citas por marca: una sola barra horizontal repartida proporcionalmente entre las 5
+// marcas (cada segmento = su cuota de citas del periodo), con leyenda de cifras al lado —
+// fusiona lo que antes eran dos vistas separadas (rosco de citas + comparativa de volumen).
+function renderCitasBar(marcas) {
+  const total = marcas.reduce((s, m) => s + m.etapa2_cita, 0);
+  const segs = marcas.filter(m => m.etapa2_cita > 0).map(m => `
+    <div class="citas-bar-seg" style="width:${(total ? m.etapa2_cita / total * 100 : 0).toFixed(2)}%;background:${BRAND_COLOR[m.marca] || 'var(--accent)'}">
+      <title>${m.marca}: ${fmt(m.etapa2_cita)} (${total ? pct(m.etapa2_cita / total * 100) : '0,0'} %)</title>
+    </div>`).join('');
+  const legend = marcas.map(m => `
+    <div class="dl-row">
+      <span class="dl-swatch" style="background:${BRAND_COLOR[m.marca] || 'var(--accent)'}"></span>
+      <span class="dl-name">${m.marca}</span>
+      <span class="dl-value">${fmt(m.etapa2_cita)}</span>
+      <span class="dl-pct">${total ? pct(m.etapa2_cita / total * 100) : '0,0'} %</span>
+    </div>`).join('');
+  $('#citas-bar').innerHTML = `
+    <div class="citas-bar-track">${segs}</div>
+    <div class="donut-legend">${legend}</div>`;
 }
 
 // Fusiona el heatmap "Leads tratados" con la tendencia: los puntos de la serie de
@@ -398,14 +398,6 @@ function renderDonut(containerId, entries, totalLabel) {
       <div class="donut-legend">${legend}</div>
     </div>`;
 }
-
-function renderCitasDonut(marcas) {
-  const c = themeColors();
-  const palette = [c.accent, c.warn, c.good, c.cat4, c.cat5];
-  const entries = marcas.map((m, i) => ({ label: m.marca, value: m.etapa2_cita, color: palette[i % palette.length] }));
-  renderDonut('#donut-citas', entries, 'citas');
-}
-
 
 function monthName(m) {
   return ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][m];
@@ -699,9 +691,8 @@ async function loadSummaryPiece(force) {
     const summary = await fetchJSON(`/api/stats/summary${apiQuery()}`);
     if (periodKey() !== key) return summary;
     renderKpis(summary.total);
-    renderCitasDonut(summary.marcas);
     renderBrands(summary.marcas);
-    renderBrandVolume(summary.marcas);
+    renderCitasBar(summary.marcas);
     renderBrandCompare(summary.comparativaMensual);
     $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
     store.periods[key] = { ...periodBundle(key), summary };
@@ -715,8 +706,7 @@ async function loadSummaryPiece(force) {
     if (periodKey() === key) {
       const msg = `<div class="loading">Error: ${e.message}</div>`;
       $('#brands').innerHTML = msg;
-      $('#donut-citas').innerHTML = msg;
-      $('#brand-volume').innerHTML = msg;
+      $('#citas-bar').innerHTML = msg;
       $('#brand-compare').innerHTML = msg;
     }
     throw e;
@@ -883,9 +873,8 @@ function renderBundle(bundle) {
   const { summary, daily, timeline, attribution } = bundle;
   if (summary) {
     renderKpis(summary.total);
-    renderCitasDonut(summary.marcas);
     renderBrands(summary.marcas);
-    renderBrandVolume(summary.marcas);
+    renderCitasBar(summary.marcas);
     renderBrandCompare(summary.comparativaMensual);
     $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
   }
@@ -905,7 +894,7 @@ function renderPlaceholder() {
   const msg = periodoIncluyeHoy()
     ? '<div class="loading">Calculando datos de hoy en vivo, puede tardar hasta 1 minuto…</div>'
     : '<div class="loading">Cargando…</div>';
-  ['#brands', '#donut-citas', '#donut-sessionsource', '#tabla-campanas', '#ultimas-citas', '#brand-volume', '#brand-compare']
+  ['#brands', '#citas-bar', '#donut-sessionsource', '#tabla-campanas', '#ultimas-citas', '#brand-compare']
     .forEach(sel => { $(sel).innerHTML = msg; });
   $('#trend-chart').innerHTML = '';
   $('#brand-detail-full').hidden = true;
