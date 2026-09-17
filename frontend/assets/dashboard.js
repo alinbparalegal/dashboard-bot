@@ -122,7 +122,6 @@ function renderBrandColumn(b) {
   const e0 = b.conversacion, e1 = b.etapa1_cualificado, e2 = b.etapa2_cita;
   const r01 = e0 ? pct(e1 / e0 * 100) : '0,0';
   const r12 = e1 ? pct(e2 / e1 * 100) : '0,0';
-  const overall = e0 ? pct(e2 / e0 * 100) : '0,0';
 
   return `
   <article class="brand-col" data-marca="${b.marca}">
@@ -146,10 +145,10 @@ function renderBrandColumn(b) {
         <span class="stage-rate">${r12} %</span>
       </div>
     </div>
-    <div class="overall">bot&rarr;cita <b>${overall} %</b> &middot; <b>${b.ingreso_min === b.ingreso_max ? fmtEUR(b.ingreso_min) : `${fmtEUR(b.ingreso_min)}–${fmtEUR(b.ingreso_max)}`}</b></div>
+    <div class="overall"><b>${b.ingreso_min === b.ingreso_max ? fmtEUR(b.ingreso_min) : `${fmtEUR(b.ingreso_min)}–${fmtEUR(b.ingreso_max)}`}</b></div>
     <div class="brand-col-actions">
-      <button type="button" class="brand-detail-toggle" data-marca="${b.marca}" data-tipo="analisis">Análisis</button>
       <button type="button" class="brand-detail-toggle brand-citas-toggle" data-marca="${b.marca}" data-tipo="citas" hidden>Citas</button>
+      <button type="button" class="brand-detail-toggle" data-marca="${b.marca}" data-tipo="analisis">Análisis</button>
     </div>
   </article>`;
 }
@@ -157,10 +156,12 @@ function renderBrandColumn(b) {
 function renderBrandDetailContent(b) {
   const motivos = topEntries(b.motivos_descarte);
   const tramites = topEntries(b.tramites_potencial);
+  const overall = b.conversacion ? pct(b.etapa2_cita / b.conversacion * 100) : '0,0';
   return `
     <div class="brand-detail-head">
       <div class="bc-icon" style="background:${BRAND_COLOR[b.marca] || 'var(--accent)'}">${BRAND_ICON[b.marca] || ''}</div>
       <h3>Análisis detallado &mdash; ${b.nombre}</h3>
+      <span class="detail-total">bot&rarr;cita <b>${overall} %</b></span>
       <button type="button" class="brand-detail-close" aria-label="Cerrar">&times;</button>
     </div>
     <p class="detail-intro">De los leads que calificaron, en qué trámite están interesados — y de los que se descartaron, por qué motivo.</p>
@@ -202,16 +203,23 @@ function aplicarBotonesCitas() {
   });
 }
 
+function marcarBotonActivo(marca, tipo) {
+  $('#brands').querySelectorAll('.brand-detail-toggle.active').forEach(b => b.classList.remove('active'));
+  if (!marca) return;
+  document.querySelector(`.brand-detail-toggle[data-marca="${marca}"][data-tipo="${tipo}"]`)?.classList.add('active');
+}
+
 function openBrandDetail(marca, tipo) {
   const panel = $('#brand-detail-full');
   const datos = tipo === 'citas' ? timelinePorCodigo[marca] : brandsPorCodigo[marca];
   if (!datos) return;
   const yaAbierto = !panel.hidden && panel.dataset.marca === marca && panel.dataset.tipo === tipo;
-  if (yaAbierto) { panel.hidden = true; return; }
+  if (yaAbierto) { panel.hidden = true; marcarBotonActivo(null); return; }
   panel.dataset.marca = marca;
   panel.dataset.tipo = tipo;
   panel.innerHTML = tipo === 'citas' ? renderTimelineDetailContent(datos) : renderBrandDetailContent(datos);
   panel.hidden = false;
+  marcarBotonActivo(marca, tipo);
   panel.querySelector('.brand-detail-close')?.addEventListener('click', () => { panel.hidden = true; });
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
