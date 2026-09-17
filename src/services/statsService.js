@@ -129,6 +129,14 @@ async function computeAtribucionDiaria(brand, fecha) {
 // se contaba como cita cualquier contacto con el tag consulta_agendada, pero eso puede incluir
 // casos sin pago real confirmado; estas tres condiciones juntas son las que el equipo valida
 // como cita/pago real (ver también el 100% de acierto de `pago info` en computeCitasTimeline).
+//
+// El campo "Setter" (asesor_comercial) tiene, en las 5 marcas, una opción "Agente <MARCA>"
+// (Agente NAC, Agente CYA...) además de "BOT" y los nombres de setters humanos — confirmado a
+// mano contra el picklist de GHL de cada marca. Cuenta como gestión del bot igual que "BOT".
+function esGestionBot(gestionadoPor, brand) {
+  return gestionadoPor === 'BOT' || gestionadoPor === `Agente ${brand.code}`;
+}
+
 async function computeCitasFiables(brand, fecha) {
   const citasContactos = await ghl.listByTag(brand, 'consulta_agendada', fecha, fecha);
   if (!citasContactos.length) return { citas: [], citas_fiables: 0 };
@@ -141,7 +149,7 @@ async function computeCitasFiables(brand, fecha) {
     const gestionadoPor = valorCampo(detalle, brand.botFieldId);
     const fechaPago = valorCampo(detalle, brand.fechaPagoFieldId);
     const verificado = c.tags.includes('pago info');
-    const esBot = gestionadoPor === 'BOT';
+    const esBot = esGestionBot(gestionadoPor, brand);
     return {
       contactId: c.id,
       nombre: c.nombre,
