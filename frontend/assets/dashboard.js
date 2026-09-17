@@ -110,12 +110,14 @@ function renderBreakdownRows(entries, total, labelFn) {
 
 // Icono + color por marca — solo para distinguir de un vistazo la fila compacta, sin relación
 // con los colores semánticos (verde=bien, ámbar=aviso) que ya usan otras partes del dashboard.
-const BRAND_ICON = { CYA: '&#9878;&#65039;', ETH: '&#127891;', ETV: '&#9992;&#65039;', NAC: '&#129411;', MNEE: '&#127970;' };
+const BRAND_ICON = { CYA: '&#9878;&#65039;', ETH: '&#127891;', ETV: '&#9992;&#65039;', NAC: '&#129706;', MNEE: '&#127970;' };
 const BRAND_COLOR = { CYA: 'var(--accent)', ETH: 'var(--cat4)', ETV: 'var(--cat5)', NAC: 'var(--cat6)', MNEE: 'var(--cat7)' };
 
-// Columna compacta de una marca (icono + funnel + tasa global) dentro de la fila compartida
-// brands-row. El botón de abajo no es un <details> propio — abre el panel brand-detail-full,
-// que ocupa todo el ancho de la caja en vez de quedar aplastado en una columna de 1/5.
+// Columna compacta de una marca (icono + código como título + funnel + tasa global), con dos
+// accesos — "Análisis" y "Citas" — que abren su contenido en el mismo panel a todo el ancho
+// (brand-detail-full) debajo de la fila, en vez de aplastarlo en 1/5 del ancho. El botón de
+// citas se añade aparte (ver aplicarBotonesCitas) porque esos datos llegan en una pieza
+// distinta y más lenta que el resumen de marca.
 function renderBrandColumn(b) {
   const e0 = b.conversacion, e1 = b.etapa1_cualificado, e2 = b.etapa2_cita;
   const r01 = e0 ? pct(e1 / e0 * 100) : '0,0';
@@ -126,10 +128,7 @@ function renderBrandColumn(b) {
   <article class="brand-col" data-marca="${b.marca}">
     <div class="brand-head">
       <div class="bc-icon" style="background:${BRAND_COLOR[b.marca] || 'var(--accent)'}">${BRAND_ICON[b.marca] || ''}</div>
-      <div class="name-block">
-        <h2>${b.nombre}</h2>
-        <span class="code">${b.marca}</span>
-      </div>
+      <h2 class="bc-code-title" title="${b.nombre}">${b.marca}</h2>
     </div>
     <div class="funnel">
       <div class="step">
@@ -148,7 +147,10 @@ function renderBrandColumn(b) {
       </div>
     </div>
     <div class="overall">bot&rarr;cita <b>${overall} %</b> &middot; <b>${b.ingreso_min === b.ingreso_max ? fmtEUR(b.ingreso_min) : `${fmtEUR(b.ingreso_min)}–${fmtEUR(b.ingreso_max)}`}</b></div>
-    <button type="button" class="brand-detail-toggle" data-marca="${b.marca}">Análisis detallado</button>
+    <div class="brand-col-actions">
+      <button type="button" class="brand-detail-toggle" data-marca="${b.marca}" data-tipo="analisis">Análisis</button>
+      <button type="button" class="brand-detail-toggle brand-citas-toggle" data-marca="${b.marca}" data-tipo="citas" hidden>Citas</button>
+    </div>
   </article>`;
 }
 
@@ -175,26 +177,40 @@ function renderBrandDetailContent(b) {
     <div class="detail-extra">De ellos, llegaron por un anuncio de Meta (Facebook/Instagram Ads): <b>${fmt(b.meta_ads_potencial)}</b> leads cualificados</div>`;
 }
 
-// Marcas de la última carga, para poder abrir su detalle sin volver a pedir nada.
+// Marcas de la última carga de cada pieza, para poder abrir su detalle sin volver a pedir nada.
 let brandsPorCodigo = {};
+let timelinePorCodigo = {};
 
 function renderBrands(marcas) {
   brandsPorCodigo = Object.fromEntries(marcas.map(b => [b.marca, b]));
   $('#brands').innerHTML = marcas.map(renderBrandColumn).join('');
   $('#brand-detail-full').hidden = true;
   $('#brands').querySelectorAll('.brand-detail-toggle').forEach(btn => {
-    btn.addEventListener('click', () => openBrandDetail(btn.dataset.marca));
+    btn.addEventListener('click', () => openBrandDetail(btn.dataset.marca, btn.dataset.tipo));
+  });
+  aplicarBotonesCitas(); // por si el timeline ya había llegado antes que el resumen
+}
+
+// El botón "Citas" no existe hasta que se sabe cuántas hay (pieza aparte, más lenta) — se
+// añade/actualiza sobre las columnas ya pintadas en vez de repintar la fila entera.
+function aplicarBotonesCitas() {
+  Object.values(timelinePorCodigo).forEach(m => {
+    const btn = document.querySelector(`.brand-col[data-marca="${m.marca}"] .brand-citas-toggle`);
+    if (!btn) return;
+    btn.hidden = !m.citas.length;
+    btn.textContent = `Citas (${fmt(m.citas.length)})`;
   });
 }
 
-function openBrandDetail(marca) {
+function openBrandDetail(marca, tipo) {
   const panel = $('#brand-detail-full');
-  const b = brandsPorCodigo[marca];
-  if (!b) return;
-  const yaAbierto = !panel.hidden && panel.dataset.marca === marca;
+  const datos = tipo === 'citas' ? timelinePorCodigo[marca] : brandsPorCodigo[marca];
+  if (!datos) return;
+  const yaAbierto = !panel.hidden && panel.dataset.marca === marca && panel.dataset.tipo === tipo;
   if (yaAbierto) { panel.hidden = true; return; }
   panel.dataset.marca = marca;
-  panel.innerHTML = renderBrandDetailContent(b);
+  panel.dataset.tipo = tipo;
+  panel.innerHTML = tipo === 'citas' ? renderTimelineDetailContent(datos) : renderBrandDetailContent(datos);
   panel.hidden = false;
   panel.querySelector('.brand-detail-close')?.addEventListener('click', () => { panel.hidden = true; });
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -513,27 +529,8 @@ function badgeCita(c) {
   return '<span class="badge warn">sin fecha de pago</span>';
 }
 
-// Igual que la fila de marcas de arriba: las 5 columnas comparten una sola caja, compactas
-// (icono + nº de citas fiables), y "Ver citas" abre el detalle completo a todo el ancho de la
-// caja — el espacio horizontal de una columna de 1/5 no da para una lista de dos columnas de
-// citas legible. Solo se cuentan las fiables (BOT + pago info + fecha de pago); las escaladas
-// a un humano no cuentan como "cita" aquí, igual que en el resto del dashboard.
-function renderTimelineColumn(m) {
-  return `
-  <article class="tl-col" data-marca="${m.marca}">
-    <div class="brand-head">
-      <div class="bc-icon" style="background:${BRAND_COLOR[m.marca] || 'var(--accent)'}">${BRAND_ICON[m.marca] || ''}</div>
-      <div class="name-block">
-        <h2>${m.nombre}</h2>
-        <span class="code">${m.marca}</span>
-      </div>
-    </div>
-    <div class="tl-col-count">${fmt(m.citas.length)}</div>
-    <div class="tl-col-sub">${m.citas.length ? 'citas' : 'sin citas todavía'}</div>
-    ${m.citas.length ? `<button type="button" class="brand-detail-toggle" data-marca="${m.marca}">Ver citas</button>` : ''}
-  </article>`;
-}
-
+// Solo se cuentan las citas fiables (BOT + pago info + fecha de pago); las escaladas a un
+// humano no cuentan como "cita" aquí, igual que en el resto del dashboard.
 function renderTimelineDetailContent(m) {
   const rows = m.citas.map(c => `
     <div class="timeline-row">
@@ -556,29 +553,12 @@ function renderTimelineDetailContent(m) {
     <div class="timeline-rows">${rows}</div>`;
 }
 
-let timelinePorCodigo = {};
-
-function renderTimeline(marcas, computedAt) {
-  $('#timeline-computed-at').textContent = computedAt ? `Calculado a las ${fmtHora(computedAt)}` : '';
+// El timeline ya no pinta su propia fila: solo guarda los datos y activa el botón "Citas" de
+// cada columna de marca (ver aplicarBotonesCitas), que abre este mismo contenido en el panel
+// compartido brand-detail-full (ver openBrandDetail).
+function renderTimeline(marcas) {
   timelinePorCodigo = Object.fromEntries(marcas.map(m => [m.marca, m]));
-  $('#timeline').innerHTML = marcas.map(renderTimelineColumn).join('');
-  $('#timeline-detail-full').hidden = true;
-  $('#timeline').querySelectorAll('.brand-detail-toggle').forEach(btn => {
-    btn.addEventListener('click', () => openTimelineDetail(btn.dataset.marca));
-  });
-}
-
-function openTimelineDetail(marca) {
-  const panel = $('#timeline-detail-full');
-  const m = timelinePorCodigo[marca];
-  if (!m) return;
-  const yaAbierto = !panel.hidden && panel.dataset.marca === marca;
-  if (yaAbierto) { panel.hidden = true; return; }
-  panel.dataset.marca = marca;
-  panel.innerHTML = renderTimelineDetailContent(m);
-  panel.hidden = false;
-  panel.querySelector('.brand-detail-close')?.addEventListener('click', () => { panel.hidden = true; });
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  aplicarBotonesCitas();
 }
 
 function renderUltimasCitas(marcas) {
@@ -754,12 +734,14 @@ async function loadTimelinePiece(force) {
   try {
     const timeline = await fetchJSON(`/api/stats/timeline${apiQuery(forceQuery)}`);
     if (periodKey() !== key) return;
-    renderTimeline(timeline.marcas, timeline.computedAt);
+    renderTimeline(timeline.marcas);
     renderUltimasCitas(timeline.marcas);
     store.periods[key] = { ...periodBundle(key), timeline };
     saveStore();
   } catch (e) {
-    if (periodKey() === key) { $('#timeline').innerHTML = `<div class="loading">Error: ${e.message}</div>`; $('#ultimas-citas').innerHTML = ''; }
+    // Sin fila propia que avisar (el timeline vive dentro de las columnas de marca): los
+    // botones "Citas" simplemente se quedan ocultos hasta el próximo intento.
+    if (periodKey() === key) $('#ultimas-citas').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
   }
 }
 
@@ -900,7 +882,7 @@ function renderBundle(bundle) {
     $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
   }
   if (daily) renderHeatmapAndTrend(daily);
-  if (timeline) { renderTimeline(timeline.marcas, timeline.computedAt); renderUltimasCitas(timeline.marcas); }
+  if (timeline) { renderTimeline(timeline.marcas); renderUltimasCitas(timeline.marcas); }
   if (attribution) renderAttribution(attribution);
 }
 
@@ -915,11 +897,11 @@ function renderPlaceholder() {
   const msg = periodoIncluyeHoy()
     ? '<div class="loading">Calculando datos de hoy en vivo, puede tardar hasta 1 minuto…</div>'
     : '<div class="loading">Cargando…</div>';
-  ['#brands', '#donut-citas', '#donut-sessionsource', '#tabla-campanas', '#timeline', '#ultimas-citas', '#brand-volume', '#brand-compare']
+  ['#brands', '#donut-citas', '#donut-sessionsource', '#tabla-campanas', '#ultimas-citas', '#brand-volume', '#brand-compare']
     .forEach(sel => { $(sel).innerHTML = msg; });
   $('#trend-chart').innerHTML = '';
   $('#brand-detail-full').hidden = true;
-  $('#timeline-detail-full').hidden = true;
+  timelinePorCodigo = {};
   $('#kpi-conversacion').textContent = '—';
   $('#kpi-cualificado').textContent = '—';
   $('#kpi-cita').textContent = '—';

@@ -251,11 +251,14 @@ section.chart-card { margin-bottom: 32px; }
 .brand-head { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--separator-inset); }
 .bc-icon { width: 30px; height: 30px; border-radius: 8px; flex: 0 0 auto; display: flex; align-items: center;
   justify-content: center; color: #fff; font-size: 14px; }
-.brand-head .name-block { min-width: 0; }
-.brand-head h2 { font-size: 13.5px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.brand-head .code { font-family: ui-monospace, monospace; font-size: 10px; color: var(--ink-faint); }
+/* El código de marca hace de título — misma fuente monoespaciada que ya se usaba para el
+   código pequeño, pero a tamaño de título en vez del nombre completo en serif. */
+.bc-code-title { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 19px; font-weight: 800;
+  letter-spacing: 0.03em; line-height: 1.1; }
 .overall { font-size: 11px; color: var(--ink-soft); margin-top: 10px; }
 .overall b { font-family: ui-monospace, monospace; color: var(--accent-ink); }
+
+.brand-col-actions { display: flex; gap: 14px; margin-top: 10px; }
 
 .funnel { display: flex; flex-direction: column; gap: 8px; }
 .step { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
@@ -266,11 +269,12 @@ section.chart-card { margin-bottom: 32px; }
 .bar-fill { height: 100%; background: var(--accent); border-radius: 3px; min-width: 3px; }
 
 .brand-detail-toggle {
-  appearance: none; border: none; background: none; padding: 0; margin-top: 10px;
+  appearance: none; border: none; background: none; padding: 0;
   font: inherit; font-size: 11.5px; font-weight: 600; color: var(--accent-ink); cursor: pointer;
 }
 .brand-detail-toggle::before { content: "▸ "; }
 .brand-detail-toggle:hover { text-decoration: underline; }
+.brand-detail-toggle[hidden] { display: none; }
 
 /* Análisis detallado — panel a todo el ancho, debajo de la fila de marcas */
 .brand-detail-full { border-top: 1px solid var(--border); padding: 16px 20px; }
@@ -295,25 +299,8 @@ section.chart-card { margin-bottom: 32px; }
 .detail-extra { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--ink-soft); }
 .detail-extra b { font-family: ui-monospace, monospace; color: var(--ink); }
 
-/* Timeline de citas */
-.timeline-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px 0; margin-bottom: 32px; box-shadow: var(--shadow); }
-.timeline-card h2 { font-size: 16px; }
-.timeline-card .header-top { margin-bottom: 0; align-items: baseline; }
-.tl-computed { font-size: 11px; color: var(--ink-faint); font-style: italic; white-space: nowrap; }
+/* Timeline de citas (contenido del panel brand-detail-full cuando tipo="citas") */
 .tl-count { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-faint); font-weight: 400; }
-
-/* Timeline por marca: misma caja compartida en 5 columnas que el análisis de marcas de
-   arriba — cada columna resume el nº de citas fiables y "Ver citas" abre el detalle completo
-   (dos columnas de filas) a todo el ancho de la caja. */
-.timeline-brands-row { display: grid; grid-template-columns: repeat(5, 1fr); margin: 16px -20px 0; }
-@media (max-width: 1100px) { .timeline-brands-row { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 700px) { .timeline-brands-row { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 460px) { .timeline-brands-row { grid-template-columns: 1fr; } }
-.tl-col { padding: 14px 16px; border-left: 1px solid var(--separator-inset); border-top: 1px solid var(--border); }
-.tl-col:first-child, .tl-col:nth-child(5n+1) { border-left: none; }
-.tl-col-count { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; }
-.tl-col-sub { font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.03em; margin-top: -2px; }
-.timeline-detail-full:not([hidden]) { border-top: 1px solid var(--border); margin: 0 -20px; padding: 16px 20px; }
 /* 2 columnas x ~10 filas visibles; con más citas que eso, hace scroll en vez de alargar
    la página indefinidamente. */
 .timeline-rows {
