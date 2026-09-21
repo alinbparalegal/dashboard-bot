@@ -758,17 +758,10 @@ function renderTimeline(marcas) {
   aplicarBotonesCitas();
 }
 
-function renderUltimasCitas(marcas) {
-  const todas = marcas.flatMap(m => m.citas.map(c => ({ ...c, marca: m.marca })));
-  todas.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
-  const ultimas = todas.slice(0, 10);
-
-  if (!ultimas.length) {
-    $('#ultimas-citas').innerHTML = '<p class="bd-empty">Sin citas todavía.</p>';
-    return;
-  }
-
-  $('#ultimas-citas').innerHTML = ultimas.map(c => `
+// Fila de una cita (avatar + nombre + marca/gestión + fecha/insignia) — compartida entre
+// "Últimas 10 citas" (Resumen, solo un vistazo) y la lista completa de la sección Citas.
+function citaRowHtml(c) {
+  return `
     <div class="lc-row">
       <div class="avatar" style="background:${colorAvatar(c.nombre)}">${iniciales(c.nombre)}</div>
       <div class="lc-body">
@@ -779,7 +772,30 @@ function renderUltimasCitas(marcas) {
         <span class="lc-fecha">${fmtFecha(c.fecha)}</span>
         ${badgeCita(c)}
       </div>
-    </div>`).join('');
+    </div>`;
+}
+
+function todasLasCitas(marcas) {
+  const todas = marcas.flatMap(m => m.citas.map(c => ({ ...c, marca: m.marca })));
+  todas.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  return todas;
+}
+
+function renderUltimasCitas(marcas) {
+  const ultimas = todasLasCitas(marcas).slice(0, 10);
+  $('#ultimas-citas').innerHTML = ultimas.length
+    ? ultimas.map(citaRowHtml).join('')
+    : '<p class="bd-empty">Sin citas todavía.</p>';
+}
+
+// Sección "Citas": todas las fiables del periodo/marca filtrados, no solo las últimas 10 —
+// para tenerlas todas a la vista en un sitio sin entrar marca por marca.
+function renderCitasLista(marcas) {
+  const todas = todasLasCitas(marcas);
+  $('#citas-lista-count').textContent = `${fmt(todas.length)} citas`;
+  $('#citas-lista').innerHTML = todas.length
+    ? todas.map(citaRowHtml).join('')
+    : '<p class="bd-empty">Sin citas todavía para este periodo.</p>';
 }
 
 function renderCampanasGrupo(titulo, campanas) {
@@ -991,6 +1007,7 @@ async function loadTimelinePiece(force) {
     if (periodKey() !== key) return;
     renderTimeline(timeline.marcas);
     renderUltimasCitas(timeline.marcas);
+    renderCitasLista(timeline.marcas);
     store.periods[key] = { ...periodBundle(key), timeline };
     saveStore();
   } catch (e) {
@@ -1143,7 +1160,7 @@ function renderBundle(bundle) {
     $('#meta-periodo').textContent = `Periodo: ${summary.desde} – ${summary.hasta}`;
   }
   if (daily) renderHeatmapAndTrend(daily);
-  if (timeline) { renderTimeline(timeline.marcas); renderUltimasCitas(timeline.marcas); }
+  if (timeline) { renderTimeline(timeline.marcas); renderUltimasCitas(timeline.marcas); renderCitasLista(timeline.marcas); }
   if (attribution) renderAttribution(attribution);
 }
 
@@ -1158,8 +1175,9 @@ function renderPlaceholder() {
   const msg = periodoIncluyeHoy()
     ? '<div class="loading">Calculando datos de hoy en vivo, puede tardar hasta 1 minuto…</div>'
     : '<div class="loading">Cargando…</div>';
-  ['#brands', '#citas-bar', '#tabla-campanas', '#ultimas-citas', '#brand-compare']
+  ['#brands', '#citas-bar', '#tabla-campanas', '#ultimas-citas', '#citas-lista', '#brand-compare']
     .forEach(sel => { $(sel).innerHTML = msg; });
+  $('#citas-lista-count').textContent = '';
   $('#trend-chart').innerHTML = '';
   $('#brand-detail-full').hidden = true;
   closeKpiDetail();

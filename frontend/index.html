@@ -44,6 +44,7 @@
       <nav class="view-tabs" id="view-tabs" aria-label="Secciones del dashboard">
         <button class="view-tab active" data-view="resumen">Resumen</button>
         <button class="view-tab" data-view="marcas">Marcas</button>
+        <button class="view-tab" data-view="citas">Citas</button>
         <button class="view-tab" data-view="marketing">Marketing</button>
       </nav>
     </header>
@@ -135,6 +136,17 @@
       <section class="brands-card" aria-label="Funnel por marca">
         <div class="brands-row" id="brands"></div>
         <div class="brand-detail-full" id="brand-detail-full" hidden></div>
+      </section>
+    </div>
+
+    <div class="view" id="view-citas" hidden>
+      <section class="chart-card">
+        <div class="header-top">
+          <h2>Citas</h2>
+          <span class="tl-computed" id="citas-lista-count"></span>
+        </div>
+        <p class="detail-intro">Todas las citas fiables (gestionadas por el bot, con pago info y fecha de pago) del periodo y marca seleccionados arriba — más recientes primero.</p>
+        <div id="citas-lista"><div class="loading">Cargando…</div></div>
       </section>
     </div>
 
