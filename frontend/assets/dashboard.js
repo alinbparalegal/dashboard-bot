@@ -427,32 +427,48 @@ function openBrandDetail(marca, tipo) {
 // una barra de volumen (donde una marca pequeña siempre parece invisible junto a una
 // grande). Solo tiene datos en "Todo" y el mes en curso — un mes cerrado del pasado no tiene
 // un "hoy" con el que compararse.
-function renderBrandCompare(comparativaMensual) {
-  if (!comparativaMensual) {
-    $('#brand-compare').innerHTML = '<p class="bd-empty">Sin datos de comparativa para este periodo.</p>';
-    return;
-  }
-  const deltas = comparativaMensual.marcas.map(m => {
-    const prev = m.anterior.conversacion;
-    const now = m.actual.conversacion;
-    const delta = prev > 0 ? ((now - prev) / prev * 100) : (now > 0 ? 100 : 0);
-    return { marca: m.marca, delta };
-  });
-  const maxAbs = Math.max(...deltas.map(d => Math.abs(d.delta)), 1);
+function deltaPct(prev, now) {
+  return prev > 0 ? ((now - prev) / prev * 100) : (now > 0 ? 100 : 0);
+}
 
-  $('#brand-compare').innerHTML = deltas.map(({ marca, delta }) => {
-    const supera = delta >= 0;
-    const width = (Math.abs(delta) / maxAbs * 50).toFixed(1); // hasta el 50% del ancho a cada lado del centro
-    return `
-    <div class="evo-row">
-      <span class="evo-name">${marca}</span>
+// Fila de una métrica dentro de "Evolución por marca": barra divergente centrada en 0%,
+// escalada contra el mayor cambio de ESA métrica entre marcas (conversación y citas se
+// escalan por separado, para que una no aplaste a la otra si se mueven en magnitudes distintas).
+function evoMetricRowHtml(label, delta, maxAbs) {
+  const supera = delta >= 0;
+  const width = (Math.abs(delta) / maxAbs * 50).toFixed(1);
+  return `
+    <div class="evo-metric-row">
+      <span class="evo-metric-label">${label}</span>
       <div class="evo-bar">
         <div class="evo-zero"></div>
         <div class="evo-fill ${supera ? 'up' : 'down'}" style="width:${width}%"></div>
       </div>
       <span class="evo-delta ${supera ? 'up' : 'down'}">${supera ? '▲' : '▼'}${pct(Math.abs(delta))}%</span>
     </div>`;
-  }).join('');
+}
+
+// Conversación y citas por separado: una marca puede tener conversación variable pero citas
+// siempre en 0 (o viceversa) — mezclarlas en una sola cifra escondía esa diferencia.
+function renderBrandCompare(comparativaMensual) {
+  if (!comparativaMensual) {
+    $('#brand-compare').innerHTML = '<p class="bd-empty">Sin datos de comparativa para este periodo.</p>';
+    return;
+  }
+  const filas = comparativaMensual.marcas.map(m => ({
+    marca: m.marca,
+    conv: deltaPct(m.anterior.conversacion, m.actual.conversacion),
+    citas: deltaPct(m.anterior.citas, m.actual.citas),
+  }));
+  const maxConv = Math.max(...filas.map(f => Math.abs(f.conv)), 1);
+  const maxCitas = Math.max(...filas.map(f => Math.abs(f.citas)), 1);
+
+  $('#brand-compare').innerHTML = filas.map(f => `
+    <div class="evo-brand">
+      <span class="evo-name">${f.marca}</span>
+      ${evoMetricRowHtml('Conv.', f.conv, maxConv)}
+      ${evoMetricRowHtml('Citas', f.citas, maxCitas)}
+    </div>`).join('');
 }
 
 // Citas por marca: una sola barra horizontal repartida proporcionalmente entre las 5
