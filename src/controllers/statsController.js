@@ -60,6 +60,19 @@ async function getChannels(req, res) {
   }
 }
 
+async function getHours(req, res) {
+  try {
+    const hasta = req.query.hasta || statsService.todayStr();
+    const desde = req.query.desde || process.env.BOT_LAUNCH_DATE || hasta;
+    const force = req.query.force === 'true';
+    const data = await statsService.getHourBreakdown(desde, hasta, force, req.query.marca || undefined);
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error en getHours:', error);
+    res.status(500).json({ message: error.message });
+  }
+}
+
 async function getTimeline(req, res) {
   try {
     const hasta = req.query.hasta || statsService.todayStr();
@@ -86,4 +99,4 @@ async function getAttribution(req, res) {
   }
 }
 
-module.exports = { getLaunchDate, getDailyTotals, getDailyDetail, getSummary, getChannels, getTimeline, getAttribution };
+module.exports = { getLaunchDate, getDailyTotals, getDailyDetail, getSummary, getChannels, getHours, getTimeline, getAttribution };

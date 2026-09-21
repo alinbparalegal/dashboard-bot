@@ -15,7 +15,6 @@
           <h1 class="title">StatsDash</h1>
         </div>
       </div>
-      <p class="subtitle">Conversación → Cualificado → Cita, para las 5 marcas GHL, con histórico diario guardado.</p>
       <div class="meta-row">
         <span id="meta-periodo">Periodo: —</span>
         <span>Fuente: GoHighLevel API + histórico propio (MongoDB)</span>
@@ -48,7 +47,7 @@
     <section class="kpi-citas-split">
       <div class="kpis-pane" aria-label="Totales agregados">
         <div class="grouped-header">Totales agregados</div>
-        <div class="kpi">
+        <div class="kpi kpi-clickable" data-kpi="conversacion" role="button" tabindex="0" aria-expanded="false">
           <div class="kpi-icon" style="background:var(--accent)">&#128172;</div>
           <div class="kpi-body">
             <span class="label">Conversación</span>
@@ -56,7 +55,7 @@
             <span class="sub">leads con tag de estado del bot</span>
           </div>
         </div>
-        <div class="kpi">
+        <div class="kpi kpi-clickable" data-kpi="cualificado" role="button" tabindex="0" aria-expanded="false">
           <div class="kpi-icon" style="background:var(--good)">&#10003;</div>
           <div class="kpi-body">
             <span class="label">Cualificado</span>
@@ -82,8 +81,17 @@
         </div>
       </div>
       <div class="citas-pane">
-        <div class="grouped-header">Últimas 10 citas</div>
-        <div id="ultimas-citas"><div class="loading">Cargando…</div></div>
+        <div id="citas-pane-default">
+          <div class="grouped-header">Últimas 10 citas</div>
+          <div id="ultimas-citas"><div class="loading">Cargando…</div></div>
+        </div>
+        <div id="citas-pane-kpi" hidden>
+          <div class="grouped-header-row">
+            <span class="grouped-header" id="kpi-detail-title">Patrones</span>
+            <button type="button" class="kpi-detail-close" id="kpi-detail-close" aria-label="Volver a últimas citas">&times;</button>
+          </div>
+          <div id="kpi-detail-body"></div>
+        </div>
       </div>
     </section>
 

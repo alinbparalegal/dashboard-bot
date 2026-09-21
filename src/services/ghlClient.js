@@ -234,6 +234,7 @@ async function listByAnyTag(brand, tags, gte, lte) {
     all.push(...contacts.map(c => ({
       id: c.id,
       tags: c.tags || [],
+      dateAdded: c.dateAdded,
       sessionSource: c.attributionSource?.sessionSource || null,
       campaign: c.attributionSource?.campaign || null,
       medium: c.attributionSource?.medium || null,

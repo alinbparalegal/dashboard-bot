@@ -81,17 +81,34 @@ const LABEL_CANAL = { canal_whatsapp: 'WhatsApp', canal_instagram: 'Instagram', 
 // marca. Acotado a un solo día, el listado de contactos con algún tag de estado (para
 // sessionSource/campaña) casi nunca pasa de una página, así que sale barato guardarlo día
 // a día en vez de recalcularlo cada vez que alguien pide un rango.
+// Hora local (Europe/Madrid) de una fecha ISO, resuelta con Intl para no desajustarse con el
+// cambio de horario de verano/invierno (un offset fijo sí lo haría).
+function horaMadrid(dateStr) {
+  return parseInt(
+    new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', hour12: false }).format(new Date(dateStr)),
+    10,
+  ) % 24;
+}
+
 async function computeAtribucionDiaria(brand, fecha) {
   const contactosDia = await ghl.listByAnyTag(brand, ESTADO_TAGS, fecha, fecha);
   const lastMessageTypes = await Promise.all(contactosDia.map(c => ghl.getLastMessageType(brand, c.id)));
 
   const canales = { canal_whatsapp: 0, canal_instagram: 0, canal_facebook: 0 };
   const session_source = {};
+  const horas = {};
   const campanasMap = new Map();
   contactosDia.forEach((c, i) => {
     const lastMessageType = lastMessageTypes[i];
     const canalTag = CANAL_DE_TIPO[lastMessageType];
     if (canalTag) canales[canalTag]++;
+
+    // Hora de creación del contacto (mismo dato ya traído para canales/session_source, sin
+    // pedir nada extra a GHL): a qué hora del día se concentran más oportunidades.
+    if (c.dateAdded) {
+      const hora = horaMadrid(c.dateAdded);
+      horas[hora] = (horas[hora] || 0) + 1;
+    }
 
     // Procedencia real: si hay canal de mensajería identificado (WhatsApp/Instagram/
     // Facebook), manda sobre la clasificación genérica de GHL — es más concreto saber por
@@ -117,7 +134,7 @@ async function computeAtribucionDiaria(brand, fecha) {
     }
   });
 
-  return { canales, session_source, campanas: [...campanasMap.values()] };
+  return { canales, session_source, horas, campanas: [...campanasMap.values()] };
 }
 
 // Detalle + verificación de fiabilidad de las citas (tag consulta_agendada) de UN día, para
@@ -224,12 +241,13 @@ async function computeCoreDiario(brand, fecha) {
 // getLiveTodayStats y getLiveAtribucionToday, que piden cada bloque por separado y más barato).
 async function computeDailyStatsForBrand(brand, fecha) {
   const core = await computeCoreDiario(brand, fecha); // incluye citas/citas_fiables
-  const { canales, session_source, campanas } = await computeAtribucionDiaria(brand, fecha);
+  const { canales, session_source, horas, campanas } = await computeAtribucionDiaria(brand, fecha);
 
   return {
     ...core,
     canales,
     session_source,
+    horas,
     campanas,
     statsVersion: 2,
     computedAt: new Date(),
@@ -548,6 +566,30 @@ function getChannelBreakdown(desde, hasta, force = false, marca) {
   return computeChannelBreakdown(desde, hasta, force, marca);
 }
 
+// Hora local (0-23) de creación de los contactos del periodo, sumando las 5 marcas — sin
+// distinguir marca, ya que el interés es cuándo se concentran las oportunidades en general.
+async function computeHourBreakdown(desde, hasta, force = false, marca) {
+  const brands = brandsFor(marca);
+  const totales = {};
+  await Promise.all(brands.map(async brand => {
+    const docs = await DailyStat.find({ marca: brand.code, fecha: { $gte: desde, $lte: hasta } }).lean();
+    for (const d of docs) {
+      const horas = mapaAObjeto(d.horas);
+      for (const h in horas) totales[h] = (totales[h] || 0) + horas[h];
+    }
+    if (hasta === todayStr()) {
+      const live = await getLiveAtribucionToday(brand, force);
+      const horas = live.horas || {};
+      for (const h in horas) totales[h] = (totales[h] || 0) + horas[h];
+    }
+  }));
+  return { desde, hasta, horas: totales, computedAt: new Date().toISOString() };
+}
+
+function getHourBreakdown(desde, hasta, force = false, marca) {
+  return computeHourBreakdown(desde, hasta, force, marca);
+}
+
 // Timeline de citas por marca: solo las fiables (BOT + pago info + fecha de pago), igual que
 // el KPI "Cita" y el resto del dashboard — antes salía cualquier contacto con el tag
 // consulta_agendada, incluidas las escaladas a un humano, lo que no encajaba con "cita" tal
@@ -629,6 +671,7 @@ module.exports = {
   getDetailForDate,
   getSummary,
   getChannelBreakdown,
+  getHourBreakdown,
   getCitasTimeline,
   getAttribution,
   todayStr,

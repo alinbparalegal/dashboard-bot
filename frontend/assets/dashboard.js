@@ -48,6 +48,180 @@ function renderKpis(total) {
     : `${fmtEUR(total.ingreso_min)}–${fmtEUR(total.ingreso_max)}`;
 }
 
+// Detalle desplegable de un KPI: por ahora solo "Conversación" tiene contenido (origen del
+// lead, día de la semana y hora del día); el resto de KPIs se deja preparado para sumarse más
+// adelante. Sustituye el contenido de "Últimas 10 citas" en vez de abrir un panel aparte.
+const WEEKDAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+// Reparto de conversaciones por día de la semana, a partir de la serie diaria ya cargada
+// para el gráfico de tendencia — no pide nada nuevo al servidor.
+function weekdayBreakdown(daily) {
+  const counts = [0, 0, 0, 0, 0, 0, 0];
+  daily.forEach(d => {
+    const dow = new Date(`${d.fecha}T00:00:00`).getDay();
+    counts[dow] += d.conversacion;
+  });
+  return WEEKDAY_ORDER.map(i => ({ label: WEEKDAY_LABELS[i], value: counts[i] }));
+}
+
+async function renderConversacionDetail() {
+  const body = $('#kpi-detail-body');
+  body.innerHTML = '<div class="loading">Cargando…</div>';
+  try {
+    const key = periodKey();
+    const cachedDaily = periodBundle(key).daily;
+    const cachedAttribution = periodBundle(key).attribution;
+    const [attribution, daily, horasData] = await Promise.all([
+      cachedAttribution ? Promise.resolve(cachedAttribution) : fetchJSON(`/api/stats/attribution${apiQuery()}`),
+      cachedDaily ? Promise.resolve(cachedDaily) : fetchJSON(`/api/stats/daily${apiQuery()}`),
+      fetchJSON(`/api/stats/hours${apiQuery()}`),
+    ]);
+
+    // Origen del lead: procedencia real ya calculada para "Procedencia real" (WhatsApp/
+    // Instagram/Facebook cuando se identifica el canal, TikTok, y el resto de sessionSource
+    // de GHL — Direct traffic, Organic Search, Paid Social, Referral...).
+    const origenEntries = Object.entries(attribution.sessionSource || {})
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+    const totalOrigen = origenEntries.reduce((s, e) => s + e.value, 0);
+
+    const semana = weekdayBreakdown(daily);
+    const maxSemana = Math.max(...semana.map(s => s.value), 1);
+
+    const horas = Array.from({ length: 24 }, (_, h) => ({ hora: h, value: horasData.horas?.[h] || 0 }));
+    const maxHora = Math.max(...horas.map(h => h.value), 1);
+    const totalHoras = horas.reduce((s, h) => s + h.value, 0);
+    const picoHora = horas.reduce((max, h) => (h.value > max.value ? h : max), horas[0]);
+
+    body.innerHTML = `
+      <div class="kpi-detail-grid">
+        <div class="kpi-detail-col">
+          <h4>Origen del lead</h4>
+          ${totalOrigen ? origenEntries.map(e => `
+            <div class="kd-row">
+              <span class="kd-name">${e.label}</span>
+              <div class="kd-track"><div class="kd-fill" style="width:${(e.value / totalOrigen * 100).toFixed(1)}%"></div></div>
+              <span class="kd-num">${fmt(e.value)}</span>
+              <span class="kd-pct">${pct(e.value / totalOrigen * 100)} %</span>
+            </div>`).join('') : '<p class="bd-empty">Sin datos</p>'}
+        </div>
+        <div class="kpi-detail-col">
+          <h4>Día de la semana</h4>
+          <div class="kd-week">
+            ${semana.map(s => `
+              <div class="kd-week-bar">
+                <div class="kd-week-track"><div class="kd-week-fill" style="height:${maxSemana ? (s.value / maxSemana * 100).toFixed(1) : 0}%"></div></div>
+                <span class="kd-week-label">${s.label}</span>
+                <span class="kd-week-num">${fmt(s.value)}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+        <div class="kpi-detail-col kpi-detail-col-wide">
+          <h4>Hora con más contactos</h4>
+          ${totalHoras ? `
+            <div class="kd-hours">
+              ${horas.map(h => `
+                <div class="kd-hour-bar ${h.hora === picoHora.hora ? 'peak' : ''}">
+                  <div class="kd-hour-fill" style="height:${(h.value / maxHora * 100).toFixed(1)}%" title="${String(h.hora).padStart(2, '0')}:00 &ndash; ${fmt(h.value)}"></div>
+                </div>`).join('')}
+            </div>
+            <div class="kd-hours-axis"><span>00h</span><span>06h</span><span>12h</span><span>18h</span><span>23h</span></div>
+            <p class="kd-hours-peak">Pico: <b>${String(picoHora.hora).padStart(2, '0')}:00–${String((picoHora.hora + 1) % 24).padStart(2, '0')}:00</b> &middot; ${fmt(picoHora.value)} contactos</p>
+          ` : '<p class="bd-empty">Sin datos por hora todavía para este periodo (se calcula desde ahora en adelante)</p>'}
+        </div>
+      </div>`;
+  } catch (e) {
+    body.innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+  }
+}
+
+// Suma un objeto {clave: cantidad} dentro de otro (acumulador), tal cual llegan
+// motivos_descarte/tramites_potencial ya serializados por marca en /api/stats/summary.
+function mergeCounts(target, source) {
+  Object.entries(source || {}).forEach(([k, v]) => { target[k] = (target[k] || 0) + v; });
+}
+
+function renderCualificadoDetail() {
+  const body = $('#kpi-detail-body');
+  const summary = periodBundle(periodKey()).summary;
+  if (!summary) { body.innerHTML = '<div class="loading">Cargando…</div>'; return; }
+
+  const totals = { cualificado: 0, enProceso: 0, noCualificado: 0 };
+  const motivos = {};
+  const tramites = {};
+  summary.marcas.forEach(b => {
+    totals.cualificado += b.etapa1_cualificado;
+    totals.enProceso += b.lead_cualificando;
+    totals.noCualificado += b.lead_no_potencial;
+    mergeCounts(motivos, b.motivos_descarte);
+    mergeCounts(tramites, b.tramites_potencial);
+  });
+  const totalGeneral = totals.cualificado + totals.enProceso + totals.noCualificado;
+  const segmentos = [
+    { label: 'Cualificado', value: totals.cualificado, color: 'var(--good)' },
+    { label: 'En proceso', value: totals.enProceso, color: 'var(--ink-faint)' },
+    { label: 'No cualificado', value: totals.noCualificado, color: 'var(--warn)' },
+  ];
+
+  const motivosEntries = topEntries(motivos);
+  const tramitesEntries = topEntries(tramites);
+
+  body.innerHTML = `
+    <div class="kd-split-track">
+      ${segmentos.filter(s => s.value > 0).map(s => `
+        <div class="kd-split-seg" style="width:${(totalGeneral ? s.value / totalGeneral * 100 : 0).toFixed(2)}%;background:${s.color}"
+          title="${s.label}: ${fmt(s.value)} (${totalGeneral ? pct(s.value / totalGeneral * 100) : '0,0'} %)"></div>`).join('')}
+    </div>
+    <div class="donut-legend kd-split-legend">
+      ${segmentos.map(s => `
+        <div class="dl-row">
+          <span class="dl-swatch" style="background:${s.color}"></span>
+          <span class="dl-name">${s.label}</span>
+          <span class="dl-value">${fmt(s.value)}</span>
+          <span class="dl-pct">${totalGeneral ? pct(s.value / totalGeneral * 100) : '0,0'} %</span>
+        </div>`).join('')}
+    </div>
+    <div class="kpi-detail-grid kpi-detail-grid-tight">
+      <div class="kpi-detail-col">
+        <h4>Motivo de descarte <span class="detail-total">${fmt(totals.noCualificado)} leads</span></h4>
+        ${motivosEntries.length ? renderBreakdownRows(motivosEntries, totals.noCualificado, labelMotivo) : '<p class="bd-empty">Sin datos</p>'}
+      </div>
+      <div class="kpi-detail-col">
+        <h4>Trámite de interés <span class="detail-total">${fmt(totals.cualificado)} leads</span></h4>
+        ${tramitesEntries.length ? renderBreakdownRows(tramitesEntries, totals.cualificado, labelTramite) : '<p class="bd-empty">Sin datos</p>'}
+      </div>
+    </div>`;
+}
+
+const KPI_DETAIL_RENDERERS = { conversacion: renderConversacionDetail, cualificado: renderCualificadoDetail };
+const KPI_DETAIL_TITLES = { conversacion: 'Conversación — patrones', cualificado: 'Cualificado — quién y por qué' };
+
+function closeKpiDetail() {
+  $('#citas-pane-kpi').hidden = true;
+  $('#citas-pane-default').hidden = false;
+  document.querySelectorAll('.kpi-clickable.active').forEach(k => { k.classList.remove('active'); k.setAttribute('aria-expanded', 'false'); });
+}
+
+function wireKpiToggles() {
+  $('#kpi-detail-close')?.addEventListener('click', closeKpiDetail);
+  document.querySelectorAll('.kpi-clickable').forEach(kpi => {
+    const render = KPI_DETAIL_RENDERERS[kpi.dataset.kpi];
+    if (!render) return;
+    kpi.addEventListener('click', () => {
+      if (kpi.classList.contains('active')) { closeKpiDetail(); return; }
+      closeKpiDetail();
+      kpi.classList.add('active');
+      kpi.setAttribute('aria-expanded', 'true');
+      $('#citas-pane-default').hidden = true;
+      $('#citas-pane-kpi').hidden = false;
+      $('#kpi-detail-title').textContent = KPI_DETAIL_TITLES[kpi.dataset.kpi] || 'Patrones';
+      render();
+    });
+    kpi.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); kpi.click(); } });
+  });
+}
+
 // Etiquetas legibles para los tags técnicos del bot, pensadas para gente no técnica.
 const TRAMITE_LABELS = {
   trabajo_cuenta_ajena: 'Trabajo por cuenta ajena',
@@ -871,6 +1045,7 @@ function showLeadCard(lead) {
 // Tolera bundles parciales: si alguna pieza falló la última vez, sencillamente no la pinta.
 function renderBundle(bundle) {
   const { summary, daily, timeline, attribution } = bundle;
+  closeKpiDetail();
   if (summary) {
     renderKpis(summary.total);
     renderBrands(summary.marcas);
@@ -898,6 +1073,7 @@ function renderPlaceholder() {
     .forEach(sel => { $(sel).innerHTML = msg; });
   $('#trend-chart').innerHTML = '';
   $('#brand-detail-full').hidden = true;
+  closeKpiDetail();
   timelinePorCodigo = {};
   $('#kpi-conversacion').textContent = '—';
   $('#kpi-cualificado').textContent = '—';
@@ -961,4 +1137,5 @@ function init() {
 $('#refresh-btn')?.addEventListener('click', updateNow);
 wireBrandPills();
 wireLeadSearch();
+wireKpiToggles();
 init();

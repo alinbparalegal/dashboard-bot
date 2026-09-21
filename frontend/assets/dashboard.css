@@ -153,8 +153,57 @@ h1.title { font-size: 28px; font-weight: 600; }
 .kpi .value { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; margin: 1px 0; }
 .kpi .sub { font-size: 11.5px; color: var(--ink-faint); }
 .kpi.accent .value { color: var(--accent-ink); }
+.kpi-clickable { cursor: pointer; }
+.kpi-clickable:hover { background: var(--surface-alt); }
+.kpi-clickable.active { background: var(--surface-alt); box-shadow: inset 3px 0 0 var(--accent); }
 .citas-pane { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 18px 20px; min-width: 0; }
 @media (max-width: 760px) { .kpi-citas-split { grid-template-columns: 1fr; gap: 16px; } }
+
+/* Detalle desplegable de un KPI (ej. patrones de "Conversación"): sustituye el contenido por
+   defecto de .citas-pane (Últimas 10 citas) en vez de abrir un panel aparte — al cerrar, se
+   vuelve a lo de siempre sin haber tocado #ultimas-citas. */
+.grouped-header-row { display: flex; align-items: center; justify-content: space-between; padding: 0 0 12px; }
+.grouped-header-row .grouped-header { padding: 0; }
+.kpi-detail-close {
+  appearance: none; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft);
+  border-radius: 999px; width: 24px; height: 24px; font-size: 15px; line-height: 1; cursor: pointer;
+}
+.kpi-detail-close:hover { border-color: var(--accent); color: var(--ink); }
+.kpi-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.kpi-detail-col-wide { grid-column: 1 / -1; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
+@media (max-width: 640px) { .kpi-detail-grid { grid-template-columns: 1fr; } }
+.kpi-detail-col h4 { font-family: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-faint); font-weight: 600; margin-bottom: 10px; }
+.kpi-detail-col h4 .detail-total { font-family: ui-monospace, monospace; color: var(--ink-soft); text-transform: none; letter-spacing: normal; font-weight: 400; }
+.kpi-detail-grid-tight { margin-top: 4px; }
+
+/* Barra proporcional de 3 segmentos (ej. Cualificado/En proceso/No cualificado) */
+.kd-split-track { display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: var(--surface-alt); margin-bottom: 12px; }
+.kd-split-seg { height: 100%; min-width: 2px; }
+.kd-split-seg:not(:last-child) { border-right: 1px solid var(--surface); }
+.kd-split-legend { flex-direction: row; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.kd-split-legend .dl-row { gap: 6px; }
+.kd-split-legend .dl-name { flex: 0 0 auto; }
+
+.kd-row { display: grid; grid-template-columns: 84px 1fr 40px 46px; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
+.kd-track { height: 7px; background: var(--surface-alt); border-radius: 3px; overflow: hidden; }
+.kd-fill { height: 100%; background: var(--accent); border-radius: 3px; min-width: 2px; }
+.kd-num { font-family: ui-monospace, monospace; text-align: right; color: var(--ink-soft); font-size: 11.5px; }
+.kd-pct { font-family: ui-monospace, monospace; text-align: right; color: var(--ink-faint); font-size: 11.5px; }
+
+.kd-week { display: flex; align-items: flex-end; gap: 8px; height: 110px; }
+.kd-week-bar { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; }
+.kd-week-track { flex: 1 1 auto; width: 100%; max-width: 26px; display: flex; align-items: flex-end; }
+.kd-week-fill { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
+.kd-week-label { font-size: 10px; color: var(--ink-faint); text-transform: uppercase; }
+.kd-week-num { font-family: ui-monospace, monospace; font-size: 10.5px; color: var(--ink-soft); }
+
+.kd-hours { display: flex; align-items: flex-end; gap: 2px; height: 70px; }
+.kd-hour-bar { flex: 1 1 0; height: 100%; display: flex; align-items: flex-end; border-radius: 2px 2px 0 0; background: var(--surface-alt); overflow: hidden; }
+.kd-hour-fill { width: 100%; background: var(--accent); min-height: 2px; }
+.kd-hour-bar.peak .kd-hour-fill { background: var(--warn); }
+.kd-hours-axis { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--ink-faint); margin-top: 4px; font-family: ui-monospace, monospace; }
+.kd-hours-peak { font-size: 12px; color: var(--ink-soft); margin-top: 8px; }
+.kd-hours-peak b { color: var(--ink); font-family: ui-monospace, monospace; }
 
 /* Avatar de iniciales + insignias de estado (citas) */
 .avatar { width: 32px; height: 32px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center;

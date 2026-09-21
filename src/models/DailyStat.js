@@ -27,6 +27,10 @@ const dailyStatSchema = new mongoose.Schema({
   // GHL salvo el día de hoy en vivo.
   canales: { type: Map, of: Number, default: {} },
   session_source: { type: Map, of: Number, default: {} },
+  // Hora local (Europe/Madrid, 0-23) de creación del contacto en GHL ese día — permite ver
+  // cuándo se concentran más oportunidades sin pedir nada nuevo a GHL (mismo contactosDia que
+  // ya se pedía para canales/session_source). Ausente en documentos anteriores a añadirse.
+  horas: { type: Map, of: Number, default: {} },
   // pago = true si el lead viene de sessionSource "Paid Social" (anuncio real, con
   // campaignId/adId de Facebook); false si el UTM de campaña es de tráfico orgánico
   // (bio de Instagram, búsqueda) etiquetado a mano — ver esTikTok/computeAtribucionDiaria.
