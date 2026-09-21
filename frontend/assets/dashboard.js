@@ -142,6 +142,27 @@ function mergeCounts(target, source) {
   Object.entries(source || {}).forEach(([k, v]) => { target[k] = (target[k] || 0) + v; });
 }
 
+// Barra proporcional de N segmentos + leyenda (Cualificado/En proceso/No cualificado,
+// verificación de citas...) — común a varios paneles de detalle de KPI.
+function renderSplitBar(segmentos) {
+  const total = segmentos.reduce((s, e) => s + e.value, 0);
+  return `
+    <div class="kd-split-track">
+      ${segmentos.filter(s => s.value > 0).map(s => `
+        <div class="kd-split-seg" style="width:${(total ? s.value / total * 100 : 0).toFixed(2)}%;background:${s.color}"
+          title="${s.label}: ${fmt(s.value)} (${total ? pct(s.value / total * 100) : '0,0'} %)"></div>`).join('')}
+    </div>
+    <div class="donut-legend kd-split-legend">
+      ${segmentos.map(s => `
+        <div class="dl-row">
+          <span class="dl-swatch" style="background:${s.color}"></span>
+          <span class="dl-name">${s.label}</span>
+          <span class="dl-value">${fmt(s.value)}</span>
+          <span class="dl-pct">${total ? pct(s.value / total * 100) : '0,0'} %</span>
+        </div>`).join('')}
+    </div>`;
+}
+
 function renderCualificadoDetail() {
   const body = $('#kpi-detail-body');
   const summary = periodBundle(periodKey()).summary;
@@ -157,31 +178,15 @@ function renderCualificadoDetail() {
     mergeCounts(motivos, b.motivos_descarte);
     mergeCounts(tramites, b.tramites_potencial);
   });
-  const totalGeneral = totals.cualificado + totals.enProceso + totals.noCualificado;
-  const segmentos = [
-    { label: 'Cualificado', value: totals.cualificado, color: 'var(--good)' },
-    { label: 'En proceso', value: totals.enProceso, color: 'var(--ink-faint)' },
-    { label: 'No cualificado', value: totals.noCualificado, color: 'var(--warn)' },
-  ];
-
   const motivosEntries = topEntries(motivos);
   const tramitesEntries = topEntries(tramites);
 
   body.innerHTML = `
-    <div class="kd-split-track">
-      ${segmentos.filter(s => s.value > 0).map(s => `
-        <div class="kd-split-seg" style="width:${(totalGeneral ? s.value / totalGeneral * 100 : 0).toFixed(2)}%;background:${s.color}"
-          title="${s.label}: ${fmt(s.value)} (${totalGeneral ? pct(s.value / totalGeneral * 100) : '0,0'} %)"></div>`).join('')}
-    </div>
-    <div class="donut-legend kd-split-legend">
-      ${segmentos.map(s => `
-        <div class="dl-row">
-          <span class="dl-swatch" style="background:${s.color}"></span>
-          <span class="dl-name">${s.label}</span>
-          <span class="dl-value">${fmt(s.value)}</span>
-          <span class="dl-pct">${totalGeneral ? pct(s.value / totalGeneral * 100) : '0,0'} %</span>
-        </div>`).join('')}
-    </div>
+    ${renderSplitBar([
+      { label: 'Cualificado', value: totals.cualificado, color: 'var(--good)' },
+      { label: 'En proceso', value: totals.enProceso, color: 'var(--ink-faint)' },
+      { label: 'No cualificado', value: totals.noCualificado, color: 'var(--warn)' },
+    ])}
     <div class="kpi-detail-grid kpi-detail-grid-tight">
       <div class="kpi-detail-col">
         <h4>Motivo de descarte <span class="detail-total">${fmt(totals.noCualificado)} leads</span></h4>
@@ -194,8 +199,32 @@ function renderCualificadoDetail() {
     </div>`;
 }
 
-const KPI_DETAIL_RENDERERS = { conversacion: renderConversacionDetail, cualificado: renderCualificadoDetail };
-const KPI_DETAIL_TITLES = { conversacion: 'Conversación — patrones', cualificado: 'Cualificado — quién y por qué' };
+async function renderCitaDetail() {
+  const body = $('#kpi-detail-body');
+  body.innerHTML = '<div class="loading">Cargando…</div>';
+  try {
+    const key = periodKey();
+    const cachedTimeline = periodBundle(key).timeline;
+    const timeline = cachedTimeline || await fetchJSON(`/api/stats/timeline${apiQuery()}`);
+    const r = timeline.resumen || { fiable: 0, humano: 0, sinVerificar: 0, sinFechaPago: 0 };
+
+    body.innerHTML = `
+      ${renderSplitBar([
+        { label: 'Verificada', value: r.fiable, color: 'var(--good)' },
+        { label: 'Gestión humana', value: r.humano, color: 'var(--cat5)' },
+        { label: 'Sin pago info', value: r.sinVerificar, color: 'var(--warn)' },
+        { label: 'Sin fecha de pago', value: r.sinFechaPago, color: 'var(--cat7)' },
+      ])}
+      <p class="detail-intro">De todas las citas agendadas (tag consulta_agendada), solo las
+        "Verificada" cuentan como cita real en KPIs e ingreso estimado — gestionadas por el bot,
+        con el tag "pago info" y la fecha de pago ya rellena.</p>`;
+  } catch (e) {
+    body.innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+  }
+}
+
+const KPI_DETAIL_RENDERERS = { conversacion: renderConversacionDetail, cualificado: renderCualificadoDetail, cita: renderCitaDetail };
+const KPI_DETAIL_TITLES = { conversacion: 'Conversación — patrones', cualificado: 'Cualificado — quién y por qué', cita: 'Cita — por qué cuenta o no' };
 
 function closeKpiDetail() {
   $('#citas-pane-kpi').hidden = true;

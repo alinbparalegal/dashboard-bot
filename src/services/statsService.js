@@ -597,6 +597,11 @@ function getHourBreakdown(desde, hasta, force = false, marca) {
 // sumando las citas ya guardadas día a día — nada de GHL en vivo salvo "hoy".
 async function computeCitasTimeline(desde, hasta, force = false, marca) {
   const brands = brandsFor(marca);
+  // Resumen de por qué una cita (tag consulta_agendada) cuenta o no como fiable — mismas 4
+  // categorías que badgeCita en el frontend: verificada del todo, gestión humana (no BOT/
+  // Agente <MARCA>), sin el tag "pago info", o BOT+verificada pero sin fecha de pago aún.
+  // Se calcula sobre las mismas citas ya traídas para el timeline, sin nada nuevo a GHL.
+  const resumen = { fiable: 0, humano: 0, sinVerificar: 0, sinFechaPago: 0 };
   const perBrand = await Promise.all(brands.map(async brand => {
     const docs = await DailyStat.find({ marca: brand.code, fecha: { $gte: desde, $lte: hasta } }).lean();
     const citas = docs.flatMap(d => d.citas || []);
@@ -604,11 +609,17 @@ async function computeCitasTimeline(desde, hasta, force = false, marca) {
       const live = await getLiveTodayStats(brand, force);
       citas.push(...(live.citas || []));
     }
+    citas.forEach(c => {
+      if (c.fiable) resumen.fiable++;
+      else if (!c.esBot) resumen.humano++;
+      else if (!c.verificado) resumen.sinVerificar++;
+      else resumen.sinFechaPago++;
+    });
     const fiables = citas.filter(c => c.fiable).sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
 
     return { marca: brand.code, nombre: brand.name, citas: fiables };
   }));
-  return { desde, hasta, marcas: perBrand, computedAt: new Date().toISOString() };
+  return { desde, hasta, marcas: perBrand, resumen, computedAt: new Date().toISOString() };
 }
 
 function getCitasTimeline(desde, hasta, force = false, marca) {
