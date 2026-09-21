@@ -93,8 +93,10 @@ async function renderConversacionDetail() {
     const maxHora = Math.max(...horas.map(h => h.value), 1);
     const totalHoras = horas.reduce((s, h) => s + h.value, 0);
     const picoHora = horas.reduce((max, h) => (h.value > max.value ? h : max), horas[0]);
+    const rango = daily.length ? `${daily[0].fecha} – ${daily[daily.length - 1].fecha}` : '';
 
     body.innerHTML = `
+      ${rango ? `<p class="kd-scope-note">Día de la semana y hora: acumulado de todo el periodo (<b>${rango}</b>), no la evolución día a día.</p>` : ''}
       <div class="kpi-detail-grid">
         <div class="kpi-detail-col">
           <h4>Origen del lead</h4>
@@ -170,33 +172,25 @@ function renderCualificadoDetail() {
 
   const totals = { cualificado: 0, enProceso: 0, noCualificado: 0 };
   const motivos = {};
-  const tramites = {};
   summary.marcas.forEach(b => {
     totals.cualificado += b.etapa1_cualificado;
     totals.enProceso += b.lead_cualificando;
     totals.noCualificado += b.lead_no_potencial;
     mergeCounts(motivos, b.motivos_descarte);
-    mergeCounts(tramites, b.tramites_potencial);
   });
   const motivosEntries = topEntries(motivos);
-  const tramitesEntries = topEntries(tramites);
 
+  // El trámite de interés de los que sí cualifican vive solo en "Análisis detallado" por
+  // marca (sección Marcas) — repetirlo aquí, agregado y sin ese contexto, duplicaba el
+  // mismo dato en dos sitios sin aportar nada nuevo.
   body.innerHTML = `
     ${renderSplitBar([
       { label: 'Cualificado', value: totals.cualificado, color: 'var(--good)' },
       { label: 'En proceso', value: totals.enProceso, color: 'var(--ink-faint)' },
       { label: 'No cualificado', value: totals.noCualificado, color: 'var(--warn)' },
     ])}
-    <div class="kpi-detail-grid kpi-detail-grid-tight">
-      <div class="kpi-detail-col">
-        <h4>Motivo de descarte <span class="detail-total">${fmt(totals.noCualificado)} leads</span></h4>
-        ${motivosEntries.length ? renderBreakdownRows(motivosEntries, totals.noCualificado, labelMotivo) : '<p class="bd-empty">Sin datos</p>'}
-      </div>
-      <div class="kpi-detail-col">
-        <h4>Trámite de interés <span class="detail-total">${fmt(totals.cualificado)} leads</span></h4>
-        ${tramitesEntries.length ? renderBreakdownRows(tramitesEntries, totals.cualificado, labelTramite) : '<p class="bd-empty">Sin datos</p>'}
-      </div>
-    </div>`;
+    <h4>Motivo de descarte <span class="detail-total">${fmt(totals.noCualificado)} leads</span></h4>
+    ${motivosEntries.length ? renderBreakdownRows(motivosEntries, totals.noCualificado, labelMotivo) : '<p class="bd-empty">Sin datos</p>'}`;
 }
 
 async function renderCitaDetail() {
@@ -817,7 +811,14 @@ function renderCampanasTable(campanasPago = [], campanasOrganico = []) {
     renderCampanasGrupo('Orgánico con UTM', campanasOrganico);
 }
 
+// "Rendimiento por campaña" sigue el periodo global (misma pieza de siempre); "Procedencia
+// real" tiene su propio periodo (ver loadProcedencia) — de ahí que ya no compartan una sola
+// función de render, aunque los dos consuman /api/stats/attribution.
 function renderAttribution(data) {
+  renderCampanasTable(data.campanasPago, data.campanasOrganico);
+}
+
+function renderProcedenciaDonut(data) {
   $('#attribution-computed-at').textContent = data.computedAt ? `Calculado a las ${fmtHora(data.computedAt)}` : '';
 
   const c = themeColors();
@@ -828,8 +829,61 @@ function renderAttribution(data) {
   const entries = top.map(([label, value], i) => ({ label, value, color: palette[i % palette.length] }));
   if (restTotal > 0) entries.push({ label: 'Otros', value: restTotal, color: c.faint });
   renderDonut('#donut-sessionsource', entries, 'leads');
+}
 
-  renderCampanasTable(data.campanasPago, data.campanasOrganico);
+// Periodo propio de "Procedencia real", independiente de las pestañas globales de arriba —
+// para poder mirar de dónde vienen los leads a distintas escalas (30 días fijos / mes en
+// curso) sin cambiar lo que se ve en el resto del dashboard. Solo respeta el filtro de marca.
+const procedenciaState = { rango: 'mes' };
+
+function procedenciaRangoFechas() {
+  const hoy = new Date();
+  const hasta = toDateStr(hoy);
+  if (procedenciaState.rango === '30d') {
+    const desde = new Date(hoy);
+    desde.setDate(desde.getDate() - 29);
+    return { desde: toDateStr(desde), hasta };
+  }
+  const desde = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`;
+  return { desde, hasta };
+}
+
+function procedenciaKey() {
+  return `${procedenciaState.rango}_${state.marca || 'todas'}`;
+}
+
+async function loadProcedencia(force) {
+  const key = procedenciaKey();
+  const { desde, hasta } = procedenciaRangoFechas();
+  const params = new URLSearchParams({ desde, hasta });
+  if (state.marca) params.set('marca', state.marca);
+  if (force) params.set('force', 'true');
+
+  const cached = store.procedencia?.[key];
+  if (cached) renderProcedenciaDonut(cached);
+  else $('#donut-sessionsource').innerHTML = '<div class="loading">Cargando…</div>';
+
+  try {
+    const data = await fetchJSON(`/api/stats/attribution?${params}`);
+    if (procedenciaKey() !== key) return;
+    renderProcedenciaDonut(data);
+    store.procedencia = { ...(store.procedencia || {}), [key]: data };
+    saveStore();
+  } catch (e) {
+    if (procedenciaKey() === key && !cached) $('#donut-sessionsource').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+  }
+}
+
+function wireProcedenciaPeriod() {
+  $('#procedencia-period')?.querySelectorAll('.mini-period-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('active')) return;
+      procedenciaState.rango = btn.dataset.rango;
+      $('#procedencia-period').querySelectorAll('.mini-period-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadProcedencia();
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------------
@@ -956,10 +1010,15 @@ async function loadAttributionPiece(force) {
     store.periods[key] = { ...periodBundle(key), attribution };
     saveStore();
   } catch (e) {
-    if (periodKey() === key) { $('#donut-sessionsource').innerHTML = `<div class="loading">Error: ${e.message}</div>`; $('#tabla-campanas').innerHTML = ''; }
+    if (periodKey() === key) $('#tabla-campanas').innerHTML = `<div class="loading">Error: ${e.message}</div>`;
   }
 }
 
+// "Procedencia real" NO se recarga aquí a propósito: tiene su propio periodo (siempre
+// "hasta hoy"), así que cambiar de pestaña de periodo global no cambia nada para ella —
+// recargarla en cada cambio de pestaña solo repetiría la misma llamada en vivo a GHL sin
+// necesidad. Se recarga por su cuenta: al cambiar de marca, al pulsar "Actualizar datos", o
+// al cambiar su propio selector 30 días/mes en curso (ver wireProcedenciaPeriod).
 function loadAllPieces(force) {
   loadSummaryPiece(force).catch(() => {});
   loadDailyPiece();
@@ -985,6 +1044,7 @@ function wireBrandPills() {
       const cached = store.periods[periodKey()];
       if (cached) renderBundle(cached); else renderPlaceholder();
       loadPeriod();
+      loadProcedencia();
     });
   });
 }
@@ -1098,7 +1158,7 @@ function renderPlaceholder() {
   const msg = periodoIncluyeHoy()
     ? '<div class="loading">Calculando datos de hoy en vivo, puede tardar hasta 1 minuto…</div>'
     : '<div class="loading">Cargando…</div>';
-  ['#brands', '#citas-bar', '#donut-sessionsource', '#tabla-campanas', '#ultimas-citas', '#brand-compare']
+  ['#brands', '#citas-bar', '#tabla-campanas', '#ultimas-citas', '#brand-compare']
     .forEach(sel => { $(sel).innerHTML = msg; });
   $('#trend-chart').innerHTML = '';
   $('#brand-detail-full').hidden = true;
@@ -1149,6 +1209,23 @@ function updateNow() {
   saveStore();
   startCooldownUI();
   loadAllPieces(true);
+  loadProcedencia(true);
+}
+
+// Pestañas de sección (Resumen/Marcas/Marketing): solo muestran/ocultan lo ya cargado, no
+// piden nada nuevo — todas las piezas se cargan igual estén o no a la vista, así cambiar de
+// sección es instantáneo.
+function wireViewTabs() {
+  $('#view-tabs')?.querySelectorAll('.view-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('active')) return;
+      $('#view-tabs').querySelectorAll('.view-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.view').forEach(v => { v.hidden = v.id !== `view-${btn.dataset.view}`; });
+      store.activeView = btn.dataset.view;
+      saveStore();
+    });
+  });
 }
 
 function init() {
@@ -1157,14 +1234,20 @@ function init() {
   if (cached && cached.summary) {
     renderBundle(cached);
     startCooldownUI();
+    loadProcedencia();
   } else {
     renderPlaceholder();
     updateNow();
+  }
+  if (store.activeView && store.activeView !== 'resumen') {
+    $(`.view-tab[data-view="${store.activeView}"]`)?.click();
   }
 }
 
 $('#refresh-btn')?.addEventListener('click', updateNow);
 wireBrandPills();
 wireLeadSearch();
+wireViewTabs();
+wireProcedenciaPeriod();
 wireKpiToggles();
 init();

@@ -80,6 +80,32 @@ h1.title { font-size: 28px; font-weight: 600; }
 .nav-divider { width: 1px; align-self: stretch; background: var(--separator-inset); }
 @media (max-width: 760px) { .nav-divider { display: none; } }
 
+/* Pestañas de sección (Resumen/Marcas/Marketing): navegación de más alto nivel que el
+   selector de periodo, así que va debajo de la navbar en vez de dentro — separa "qué ventana
+   de tiempo miro" de "qué parte del dashboard veo". */
+.view-tabs { display: flex; gap: 4px; margin-top: 10px; }
+.view-tab {
+  appearance: none; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft);
+  font: inherit; font-size: 13px; font-weight: 700; padding: 8px 16px; border-radius: 10px 10px 0 0;
+  cursor: pointer; border-bottom: none; position: relative; top: 1px;
+}
+.view-tab:hover { color: var(--ink); }
+.view-tab.active { background: var(--bg); color: var(--ink); border-bottom: 1px solid var(--bg); }
+.view { padding-top: 4px; }
+
+/* Mismo control segmentado que .period-tabs, en miniatura, para un periodo propio dentro de
+   una sola tarjeta (ej. "Procedencia real") sin interferir con las pestañas globales. */
+.mini-period-tabs {
+  display: inline-flex; gap: 2px; flex: 0 0 auto;
+  background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 2px;
+}
+.mini-period-tab {
+  background: transparent; color: var(--ink-soft); border: none;
+  border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.mini-period-tab:hover { color: var(--ink); }
+.mini-period-tab.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
 .brand-pills { display: flex; gap: 6px; flex: 0 0 auto; flex-wrap: wrap; }
 .brand-pill {
   appearance: none; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft);
@@ -172,8 +198,8 @@ h1.title { font-size: 28px; font-weight: 600; }
 .kpi-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .kpi-detail-col-wide { grid-column: 1 / -1; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
 @media (max-width: 640px) { .kpi-detail-grid { grid-template-columns: 1fr; } }
-.kpi-detail-col h4 { font-family: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-faint); font-weight: 600; margin-bottom: 10px; }
-.kpi-detail-col h4 .detail-total { font-family: ui-monospace, monospace; color: var(--ink-soft); text-transform: none; letter-spacing: normal; font-weight: 400; }
+.kpi-detail-col h4, #kpi-detail-body h4 { font-family: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-faint); font-weight: 600; margin-bottom: 10px; }
+.kpi-detail-col h4 .detail-total, #kpi-detail-body h4 .detail-total { font-family: ui-monospace, monospace; color: var(--ink-soft); text-transform: none; letter-spacing: normal; font-weight: 400; }
 .kpi-detail-grid-tight { margin-top: 4px; }
 
 /* Barra proporcional de 3 segmentos (ej. Cualificado/En proceso/No cualificado) */
@@ -204,6 +230,9 @@ h1.title { font-size: 28px; font-weight: 600; }
 .kd-hours-axis { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--ink-faint); margin-top: 4px; font-family: ui-monospace, monospace; }
 .kd-hours-peak { font-size: 12px; color: var(--ink-soft); margin-top: 8px; }
 .kd-hours-peak b { color: var(--ink); font-family: ui-monospace, monospace; }
+
+.kd-scope-note { font-size: 11px; color: var(--ink-faint); font-style: italic; margin: 0 0 14px; }
+.kd-scope-note b { color: var(--ink-soft); font-style: normal; font-family: ui-monospace, monospace; }
 
 /* Avatar de iniciales + insignias de estado (citas) */
 .avatar { width: 32px; height: 32px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center;
