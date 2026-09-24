@@ -156,7 +156,7 @@ function esGestionBot(gestionadoPor, brand) {
 
 async function computeCitasFiables(brand, fecha) {
   const citasContactos = await ghl.listByTag(brand, 'consulta_agendada', fecha, fecha);
-  if (!citasContactos.length) return { citas: [], citas_fiables: 0 };
+  if (!citasContactos.length) return { citas: [], citas_fiables: 0, pago_confirmado: 0 };
 
   const citasDetalles = await Promise.all(citasContactos.map(c => ghl.getContact(brand, c.id)));
   const valorCampo = (detalle, fieldId) => (detalle?.customFields || []).find(f => f.id === fieldId)?.value || null;
@@ -176,10 +176,21 @@ async function computeCitasFiables(brand, fecha) {
       esBot,
       fechaPago,
       fiable: esBot && verificado && !!fechaPago,
+      // Asesoría pagada y confirmada (bot o humano, a diferencia de "fiable" que exige bot) que
+      // siguió adelante contratando el trámite — mismo tag ya traído en c.tags, sin pedir nada
+      // nuevo a GHL. Sirve para medir cuántos se quedan solo en la asesoría.
+      clientePostventa: c.tags.includes('cliente_postventa'),
     };
   });
 
-  return { citas, citas_fiables: citas.filter(c => c.fiable).length };
+  return {
+    citas,
+    citas_fiables: citas.filter(c => c.fiable).length,
+    // Asesoría pagada y confirmada, gestionada por el bot O por un humano — a diferencia de
+    // citas_fiables (que exige bot), esto es "contrató la asesoría" en general. Denominador
+    // para medir cuántos de los que pagan siguen adelante con el trámite (cliente_postventa).
+    pago_confirmado: citas.filter(c => c.verificado && !!c.fechaPago).length,
+  };
 }
 
 // Conteos "core" (conversación/cualificado/cita y sus desgloses) de una marca para UN día,
@@ -214,7 +225,7 @@ async function computeCoreDiario(brand, fecha) {
   // consulta_agendada (tag crudo) sigue contando para el funnel/conversación tal cual siempre
   // lo hizo; citas_fiables (BOT + pago info + fecha de pago) es la que se usa como "cita" real
   // en KPIs, comparativas e ingreso estimado — ver computeCitasFiables.
-  const { citas, citas_fiables } = await computeCitasFiables(brand, fecha);
+  const { citas, citas_fiables, pago_confirmado } = await computeCitasFiables(brand, fecha);
 
   const conversacion = lead_cualificando + lead_potencial + pago_pendiente + consulta_agendada + cliente_postventa + lead_no_potencial;
 
@@ -233,6 +244,7 @@ async function computeCoreDiario(brand, fecha) {
     meta_ads_potencial,
     citas,
     citas_fiables,
+    pago_confirmado,
   };
 }
 
@@ -413,6 +425,7 @@ async function getSummary(desde, hasta, mesReferencia, marca) {
       nombre: brand.name,
       conversacion: 0, lead_cualificando: 0, lead_potencial: 0, pago_pendiente: 0,
       consulta_agendada: 0, cliente_postventa: 0, lead_no_potencial: 0, citas_fiables: 0,
+      pago_confirmado: 0,
       motivos_descarte: {}, tramites_potencial: {}, meta_ads_potencial: 0,
     };
 
@@ -426,6 +439,7 @@ async function getSummary(desde, hasta, mesReferencia, marca) {
       acc.cliente_postventa += d.cliente_postventa;
       acc.lead_no_potencial += d.lead_no_potencial;
       acc.citas_fiables += d.citas_fiables || 0;
+      acc.pago_confirmado += d.pago_confirmado || 0;
       mergeMaps(acc.motivos_descarte, d.motivos_descarte instanceof Map ? Object.fromEntries(d.motivos_descarte) : d.motivos_descarte);
       mergeMaps(acc.tramites_potencial, d.tramites_potencial instanceof Map ? Object.fromEntries(d.tramites_potencial) : d.tramites_potencial);
       acc.meta_ads_potencial += d.meta_ads_potencial;
@@ -441,6 +455,7 @@ async function getSummary(desde, hasta, mesReferencia, marca) {
       acc.cliente_postventa += live.cliente_postventa;
       acc.lead_no_potencial += live.lead_no_potencial;
       acc.citas_fiables += live.citas_fiables || 0;
+      acc.pago_confirmado += live.pago_confirmado || 0;
       mergeMaps(acc.motivos_descarte, live.motivos_descarte);
       mergeMaps(acc.tramites_potencial, live.tramites_potencial);
       acc.meta_ads_potencial += live.meta_ads_potencial;
@@ -451,6 +466,9 @@ async function getSummary(desde, hasta, mesReferencia, marca) {
     // rellena (ver computeCitasFiables). El tag consulta_agendada por sí solo puede incluir
     // casos sin pago real confirmado.
     acc.etapa2_cita = acc.citas_fiables;
+    // "Cliente" (etapa3_venta): de TODAS las asesorías pagadas (bot o humano, pago_confirmado),
+    // cuántas siguieron adelante con el trámite (tag cliente_postventa) — a diferencia de
+    // etapa2_cita, aquí no importa quién gestionó la cita.
     acc.etapa3_venta = acc.cliente_postventa;
 
     // Ingreso estimado de las citas: no hay tag de modalidad (online/presencial) fiable en GHL,
@@ -467,10 +485,11 @@ async function getSummary(desde, hasta, mesReferencia, marca) {
     acc.etapa1_cualificado += b.etapa1_cualificado;
     acc.etapa2_cita += b.etapa2_cita;
     acc.etapa3_venta += b.etapa3_venta;
+    acc.pago_confirmado += b.pago_confirmado;
     acc.ingreso_min += b.ingreso_min;
     acc.ingreso_max += b.ingreso_max;
     return acc;
-  }, { conversacion: 0, etapa1_cualificado: 0, etapa2_cita: 0, etapa3_venta: 0, ingreso_min: 0, ingreso_max: 0 });
+  }, { conversacion: 0, etapa1_cualificado: 0, etapa2_cita: 0, etapa3_venta: 0, pago_confirmado: 0, ingreso_min: 0, ingreso_max: 0 });
 
   // mesReferencia: el mes de la pestaña activa (o el mes en curso si es "Todo", que no tiene
   // un mes propio). Antes solo se calculaba para Todo/mes en curso; ahora cualquier mes

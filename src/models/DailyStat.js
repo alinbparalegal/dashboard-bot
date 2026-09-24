@@ -16,6 +16,10 @@ const dailyStatSchema = new mongoose.Schema({
   // cuenta como "cita" en KPIs/comparativas/ingreso estimado; consulta_agendada de arriba
   // sigue siendo el tag crudo, para el funnel de conversación.
   citas_fiables: { type: Number, default: 0 },
+  // Asesoría pagada y confirmada (pago info + fecha de pago), gestionada por el bot O por un
+  // humano — a diferencia de citas_fiables, que exige bot. Denominador para medir cuántos de
+  // los que pagan siguen adelante con el trámite (cliente_postventa, arriba).
+  pago_confirmado: { type: Number, default: 0 },
 
   motivos_descarte: { type: Map, of: Number, default: {} },
   tramites_potencial: { type: Map, of: Number, default: {} },
@@ -56,6 +60,10 @@ const dailyStatSchema = new mongoose.Schema({
     esBot: Boolean,
     fechaPago: String,
     fiable: Boolean,
+    // Asesoría pagada (bot o humano) que además contrató el trámite (tag cliente_postventa) —
+    // distinto de "fiable", que exige gestión del bot. Ausente en citas guardadas antes de
+    // añadirse este campo.
+    clientePostventa: Boolean,
     _id: false,
   }],
 

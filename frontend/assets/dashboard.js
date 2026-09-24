@@ -43,6 +43,11 @@ function renderKpis(total) {
   $('#kpi-cualificado-sub').textContent = `${pct(e0 ? (e1 / e0 * 100) : 0)} % de conversación`;
   $('#kpi-cita').textContent = fmt(e2);
   $('#kpi-cita-sub').textContent = `${pct(e1 ? (e2 / e1 * 100) : 0)} % de cualificados · ${pct(e0 ? (e2 / e0 * 100) : 0)} % global`;
+  const siguio = total.etapa3_venta || 0, pago = total.pago_confirmado || 0;
+  $('#kpi-cliente').textContent = fmt(siguio);
+  $('#kpi-cliente-sub').textContent = pago
+    ? `${pct(siguio / pago * 100)} % de ${fmt(pago)} asesorías pagadas`
+    : 'de asesorías pagadas (bot o humano)';
   $('#kpi-ingreso').textContent = total.ingreso_min === total.ingreso_max
     ? fmtEUR(total.ingreso_min)
     : `${fmtEUR(total.ingreso_min)}–${fmtEUR(total.ingreso_max)}`;
@@ -217,8 +222,37 @@ async function renderCitaDetail() {
   }
 }
 
-const KPI_DETAIL_RENDERERS = { conversacion: renderConversacionDetail, cualificado: renderCualificadoDetail, cita: renderCitaDetail };
-const KPI_DETAIL_TITLES = { conversacion: 'Conversación — patrones', cualificado: 'Cualificado — quién y por qué', cita: 'Cita — por qué cuenta o no' };
+// "Cliente": de TODAS las asesorías pagadas y confirmadas (bot o humano — pago_confirmado),
+// cuántas siguieron adelante con el trámite (tag cliente_postventa, etapa3_venta). A
+// diferencia de "Cita", aquí no importa quién gestionó la cita.
+function renderClienteDetail() {
+  const body = $('#kpi-detail-body');
+  const summary = periodBundle(periodKey()).summary;
+  if (!summary) { body.innerHTML = '<div class="loading">Cargando…</div>'; return; }
+
+  const pago = summary.total.pago_confirmado || 0;
+  const siguio = summary.total.etapa3_venta || 0;
+
+  // pago_confirmado es un campo nuevo: los días ya guardados antes de añadirse no lo tienen
+  // (se quedan en 0), mientras que etapa3_venta (cliente_postventa) sí es histórico — mezclar
+  // los dos en un periodo antiguo daría un "no siguió" negativo o sin sentido.
+  if (pago < siguio) {
+    body.innerHTML = '<p class="bd-empty">Este dato es nuevo (asesoría pagada, bot o humano): los periodos anteriores a hoy todavía no lo tienen calculado. Se irá completando día a día a partir de ahora.</p>';
+    return;
+  }
+
+  body.innerHTML = `
+    ${renderSplitBar([
+      { label: 'Siguió con el trámite', value: siguio, color: 'var(--good)' },
+      { label: 'No siguió', value: pago - siguio, color: 'var(--warn)' },
+    ])}
+    <p class="detail-intro">De todos los que pagaron y confirmaron la asesoría (gestionada por
+      el bot o por un humano, a diferencia de "Cita"), cuántos siguieron adelante contratando
+      el trámite (tag cliente_postventa) y cuántos se quedaron solo en la asesoría.</p>`;
+}
+
+const KPI_DETAIL_RENDERERS = { conversacion: renderConversacionDetail, cualificado: renderCualificadoDetail, cita: renderCitaDetail, cliente: renderClienteDetail };
+const KPI_DETAIL_TITLES = { conversacion: 'Conversación — patrones', cualificado: 'Cualificado — quién y por qué', cita: 'Cita — por qué cuenta o no', cliente: 'Cliente — ¿sigue con el trámite?' };
 
 function closeKpiDetail() {
   $('#citas-pane-kpi').hidden = true;
@@ -1201,6 +1235,7 @@ function renderPlaceholder() {
   $('#kpi-conversacion').textContent = '—';
   $('#kpi-cualificado').textContent = '—';
   $('#kpi-cita').textContent = '—';
+  $('#kpi-cliente').textContent = '—';
   $('#kpi-ingreso').textContent = '—';
   $('#meta-periodo').textContent = 'Periodo: —';
 }
